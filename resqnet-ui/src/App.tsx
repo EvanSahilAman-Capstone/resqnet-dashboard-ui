@@ -1,20 +1,22 @@
 import './App.css'
 import Navbar from './components/Navbar'
-
-// This will be the landing page for the First Responders view. 
-// This is a VERY early prototype and will surely be updated as we go.
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
+import Alerts from './pages/Alerts';
+import Settings from './pages/Settings';
 
 function App() {
   return (
-    <>
+    <Router>
       <Navbar />
-        <main className="flex flex-col items-center justify-center h-screen bg-linear-to-b from-red-200 to-yellow-300">
-          <h1 className="text-4xl font-bold text-gray-900 mb-6">Welcome to the Wildfire Response System</h1>
-          <p className="max-w-xl text-center text-gray-700 mb-8">
-            Click on "Dashboard" in the top-right to view First Responder Dashboard
-          </p>
-        </main>
-    </>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<Dashboard />} /> 
+        <Route path="/alerts" element={<Alerts />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes> 
+    </Router>
   )
 }
 
