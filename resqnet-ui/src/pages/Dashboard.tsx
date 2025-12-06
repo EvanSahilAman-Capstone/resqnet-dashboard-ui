@@ -1,17 +1,124 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Map from "../components/Map";
+import type { BroadcastAlert } from "../components/Map";
 import FireReportCard from "../components/FireReportCard";
 import { useLocalData } from "../hooks/useLocalData.ts";
 import type { BroadcastMessage } from "../components/BroadcastForm.tsx";
 import BroadcastForm from "../components/BroadcastForm.tsx";
 
 const Dashboard: React.FC = () => {
-  const { fires, evacRoute, loading, setFires } = useLocalData();
+  const { fires, evacRoute, loading } = useLocalData();
+  const [broadcastAlerts, setBroadcastAlerts] = useState<BroadcastAlert[]>([]);
+  const [isPlacingAlert, setIsPlacingAlert] = useState(false);
+  const [pendingBroadcast, setPendingBroadcast] = useState<BroadcastMessage | null>(null);
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+
+  // Fetch existing broadcasts on mount
+  useEffect(() => {
+    const fetchBroadcasts = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/broadcasts');
+        const data = await res.json();
+        const alerts: BroadcastAlert[] = data.map((b: any, idx: number) => ({
+          id: b._id || `broadcast-${idx}`,
+          position: b.coordinates || [44.5, -79.5],
+          radius: b.radius,
+          priority: b.priority.toUpperCase(),
+          message: b.message,
+        }));
+        setBroadcastAlerts(alerts);
+      } catch (err) {
+        console.error("Failed to fetch broadcasts:", err);
+      }
+    };
+
+    fetchBroadcasts();
+  }, []);
 
   const handleBroadcast = async (data: BroadcastMessage) => {
-    console.log('Broadcast: ', data);
-    alert(`Broadcast sent: ${data.message}`);
+    setPendingBroadcast(data);
+    setIsPlacingAlert(true);
+    alert('Click on the map to place the broadcast alert location');
+  };
+
+// Refresh broadcasts from server
+const refreshBroadcasts = async () => {
+  try {
+    const res = await fetch('http://127.0.0.1:8000/broadcasts');
+    const data = await res.json();
+    const alerts: BroadcastAlert[] = data.map((b: any) => ({
+      id: b._id || b.id,
+      position: b.coordinates || [44.5, -79.5],
+      radius: b.radius,
+      priority: b.priority.toUpperCase(),
+      message: b.message,
+    }));
+    setBroadcastAlerts(alerts);
+  } catch (err) {
+    console.error("Failed to fetch broadcasts:", err);
   }
+};
+
+// Call refreshBroadcasts every 10 seconds to sync with Alerts page changes
+useEffect(() => {
+  const interval = setInterval(refreshBroadcasts, 10000);
+  return () => clearInterval(interval);
+}, []);
+
+
+  const handleMapClick = async (lat: number, lng: number) => {
+    if (!pendingBroadcast) return;
+
+    setIsPlacingAlert(false);
+    setBroadcastLoading(true);
+
+    try {
+      const broadcastData = {
+        ...pendingBroadcast,
+        coordinates: [lat, lng],
+        priority: pendingBroadcast.priority.toLowerCase(),
+      };
+
+      const res = await fetch('http://127.0.0.1:8000/broadcast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(broadcastData),
+      });
+
+      const result = await res.json();
+
+      if (result.status === 'success') {
+        const newAlert: BroadcastAlert = {
+          id: result.broadcast_id,
+          position: [lat, lng],
+          radius: pendingBroadcast.radius,
+          priority: pendingBroadcast.priority,
+          message: pendingBroadcast.message,
+        };
+        
+        setBroadcastAlerts(prev => [...prev, newAlert]);
+        alert(`Broadcast sent successfully!\n\nMessage: ${pendingBroadcast.message}\nLocation: [${lat.toFixed(4)}, ${lng.toFixed(4)}]\nRadius: ${pendingBroadcast.radius}km`);
+      } else {
+        alert('Failed to send broadcast');
+      }
+    } catch (err) {
+      console.error('Broadcast error:', err);
+      alert('Error sending broadcast');
+    } finally {
+      setPendingBroadcast(null);
+      setBroadcastLoading(false);
+    }
+  };
+
+  const wildfireEvents = fires.map((fire) => ({
+    id: fire.report_id,
+    latitude: fire.coordinates[0],
+    longitude: fire.coordinates[1],
+    riskLevel: fire.severity.toUpperCase() as 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME',
+    message: `${fire.hazard_type} reported by ${fire.uploading_user}`,
+  }));
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-gray-50">
@@ -20,7 +127,12 @@ const Dashboard: React.FC = () => {
         {/* BROADCAST FORM COMPONENT */}
         <div className="bg-white shadow-lg rounded-xl p-6">
             <h3 className="text-2xl font-semibold text-red-700 mb-6">Broadcast Alert</h3>
-            <BroadcastForm onSubmit={handleBroadcast} />
+            {isPlacingAlert && (
+              <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded-lg text-sm font-semibold">
+                📍 Click on the map to place alert location
+              </div>
+            )}
+            <BroadcastForm onSubmit={handleBroadcast} loading={broadcastLoading} />
         </div>
 
         {/* LIVE STATUS SECTION */}
@@ -59,7 +171,13 @@ const Dashboard: React.FC = () => {
       {/* MAP COMPONENT */}
       <div className="lg:w-2/3 w-full p-6">
         <div className="bg-white w-full h-full rounded-xl shadow-xl p-1">
-          <Map fires={fires} evacuationRoute={evacRoute} />
+          <Map 
+            fires={wildfireEvents} 
+            evacuationRoute={evacRoute}
+            broadcastAlerts={broadcastAlerts}
+            onMapClick={handleMapClick}
+            isPlacingAlert={isPlacingAlert}
+          />
         </div>
       </div>
     </div>

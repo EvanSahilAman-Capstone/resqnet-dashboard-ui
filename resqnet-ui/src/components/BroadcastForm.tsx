@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; 
+
 
 export interface BroadcastMessage {
     message: string;
@@ -6,10 +7,12 @@ export interface BroadcastMessage {
     priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 }
 
+
 interface BroadcastFormProps {
     onSubmit: (data: BroadcastMessage) => void;
     loading?: boolean;
 }
+
 
 const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false }) => {
     const [broadcast, setBroadcast] = useState<BroadcastMessage>({
@@ -18,6 +21,7 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
         priority: 'MEDIUM'
     });
 
+
     const handleBroadcastChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
         setBroadcast(prev => ({
             ...prev,
@@ -25,18 +29,22 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
         }));
     };
 
+
     const handlePriorityChange = (priority: BroadcastMessage['priority']) => {
         setBroadcast(prev => ({ ...prev, priority }));
     };
+
 
     const handleRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setBroadcast(prev => ({ ...prev, radius: Number(e.target.value) }));
     };
 
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onSubmit(broadcast);
     };
+
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -53,6 +61,7 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
                 />
             </div>
 
+
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Radius</label>
                 <div className="flex items-center space-x-4">
@@ -68,6 +77,7 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
                     <span className="font-mono text-lg">{broadcast.radius} km</span>
                 </div>
             </div>
+
 
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Priority</label>
@@ -92,6 +102,7 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
                 </div>
             </div>
 
+
             <button
                 type="submit"
                 disabled={loading}
@@ -104,5 +115,6 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
         </form>
     );
 };
+
 
 export default BroadcastForm;
