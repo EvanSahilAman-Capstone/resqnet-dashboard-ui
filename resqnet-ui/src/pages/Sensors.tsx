@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 export interface Sensor {
@@ -17,33 +17,8 @@ export interface Sensor {
 
 const Sensors: React.FC = () => {
     const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null);
-    const [sensors] = useState<Sensor[]>([
-        // Adding two different test sensors for now (hard-coded)
-        {
-            id: 'sensor-001',
-            name: 'Test Sensor 1',
-            status: 'ONLINE',
-            latitude: 44.5123,
-            longitude: -79.4876,
-            health: 92,
-            temperature: 28.4,
-            humidity: 45,
-            battery:78,
-            lastPing: new Date().toISOString()
-        },
-        {
-            id: 'sensor-002',
-            name: 'Test Sensor 2',
-            status: 'ERROR',
-            latitude: 44.5123,
-            longitude: -79.4876,
-            health: 85,
-            temperature: 29.3,
-            humidity: 43,
-            battery:80,
-            lastPing: new Date().toISOString()
-        }
-    ]); 
+    const [sensors, setSensors] = useState<Sensor[]>([]); 
+    const [loading, setLoading] = useState(true);
 
     // Status colors for badges
     const getStatusColor = (status: Sensor['status']) => {
@@ -55,6 +30,57 @@ const Sensors: React.FC = () => {
             default: return 'bg-gray-100 text-gray-800';
         }
     };
+
+    // Maps backend sensor data to UI sensor page
+    const mapBackendToSensor = (backend: any): Sensor => {
+
+        // Uses 'last seen' to determine if sensor is regularly sending data
+        const ageSec = Date.now() / 1000 - backend.last_seen;
+        let status: Sensor['status'] = 'OFFLINE';
+        if (ageSec < 60) status = 'ONLINE';
+        else if (ageSec < 300) status = 'WARNING';
+        
+        return {
+            id: backend.id,
+            name: backend.id,
+            status,
+            latitude: Number(backend.lat),
+            longitude: Number(backend.lng),
+            health: 100,                        // hardcoded for now
+            temperature: Number(backend.temperature),
+            humidity: backend.humidity,
+            battery: 100,                       // hardcoded for now
+            lastPing: new Date(backend.last_seen * 1000).toISOString(),
+        };
+    };
+
+    useEffect(() => {
+        const fetchSensors = async () => {
+            try {
+                const res = await fetch('http://localhost:8000/sensors');
+                const data = await res.json();
+                const mapped: Sensor[] = data.map(mapBackendToSensor);
+                setSensors(mapped);
+
+                setSelectedSensor(prev => {
+                    if (prev) {
+                        const updated = mapped.find(s => s.id === prev.id);
+                        return updated ?? prev;
+                    }
+
+                    return mapped[0] ?? null;
+                })
+            } catch (err) {
+                console.error('Failed to fetch sensors', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSensors();
+        const interval = setInterval(fetchSensors, 10000);
+        return () => clearInterval(interval);
+    });
 
     return (
         <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-gray-50">
@@ -72,7 +98,13 @@ const Sensors: React.FC = () => {
                     </Link>
                 </div>
 
-                {sensors.length === 0 ? (
+                {loading ? (
+                    <div className="bg-white shadow-lg rounded-xl p-8 text-center">
+                        <div className="text-4xl text-gray-400 mb-4">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">Loading Sensors...</h3>
+                        </div>
+                    </div>
+                ) : sensors.length === 0 ? (
                     <div className="bg-white shadow-lg rounded-xl p-8 text-center">
                         <div className="text-4xl text-gray-400 mb-4">📡</div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -123,6 +155,7 @@ const Sensors: React.FC = () => {
                         ))}
                     </div>
                 )}
+                
             </div>
 
             {/* RIGHT: Selected Sensor Details */}
