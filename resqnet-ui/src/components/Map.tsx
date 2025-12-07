@@ -2,15 +2,36 @@ import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import type { WildfireEvent } from '../hooks/useLocalData.ts'; 
+import type { WildfireEvent } from '../hooks/useLocalData.ts';
+import sensorGif from '../assets/sensor.gif';
+import reportGif from '../assets/report.gif';
+import alertGif from '../assets/alert.gif';
 
-// Fix Leaflet Icons
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+// Fire report icon - in assets/report.gif 
+const fireIcon = new L.DivIcon({
+    html: `<img src="${reportGif}" style="width: 40px; height: 40px; background: transparent;" />`,
+    className: 'custom-fire-icon',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -20]
+});
 
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-    iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+// Sensor icon - in assets/sensor.gif
+const sensorIcon = new L.DivIcon({
+    html: `<img src="${sensorGif}" style="width: 40px; height: 40px; background: transparent;" />`,
+    className: 'custom-sensor-icon',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -20]
+});
+
+// Alert/Broadcast icon -in assets/alert.gif
+const alertIcon = new L.DivIcon({
+    html: `<img src="${alertGif}" style="width: 40px; height: 40px; background: transparent;" />`,
+    className: 'custom-alert-icon',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -20]
 });
 
 export interface BroadcastAlert {
@@ -21,10 +42,24 @@ export interface BroadcastAlert {
     message: string;
 }
 
+export interface Sensor {
+    id: string;
+    name: string;
+    status: 'ONLINE' | 'OFFLINE' | 'WARNING' | 'ERROR';
+    latitude: number;
+    longitude: number;
+    health: number;
+    temperature: number;
+    humidity: number;
+    battery: number;
+    lastPing: string;
+}
+
 interface MapProps {
     fires: WildfireEvent[];
     evacuationRoute: [number, number][];
     broadcastAlerts?: BroadcastAlert[];
+    sensors?: Sensor[];
     onMapClick?: (lat: number, lng: number) => void;
     isPlacingAlert?: boolean;
 }
@@ -41,7 +76,7 @@ const MapClickHandler: React.FC<{ onMapClick?: (lat: number, lng: number) => voi
     return null;
 };
 
-const Map: React.FC<MapProps> = ({ fires, evacuationRoute, broadcastAlerts = [], onMapClick, isPlacingAlert = false }) => {
+const Map: React.FC<MapProps> = ({ fires, evacuationRoute, broadcastAlerts = [], sensors = [], onMapClick, isPlacingAlert = false }) => {
     const defaultCenter: L.LatLngTuple = [44.5, -79.5];
 
     // Color mapping for priority levels
@@ -52,8 +87,27 @@ const Map: React.FC<MapProps> = ({ fires, evacuationRoute, broadcastAlerts = [],
         URGENT: '#DC2626',
     };
 
+    // Get sensor status color for popup
+    const getSensorStatusColor = (status: Sensor['status']) => {
+        switch (status) {
+            case 'ONLINE': return '#10B981';
+            case 'WARNING': return '#F59E0B';
+            case 'OFFLINE': return '#6B7280';
+            case 'ERROR': return '#EF4444';
+            default: return '#6B7280';
+        }
+    };
+
     return (
         <div className="w-full h-full rounded-xl shadow-inner">
+            <style>{`
+                .custom-fire-icon,
+                .custom-sensor-icon,
+                .custom-alert-icon {
+                    background: transparent !important;
+                    border: none !important;
+                }
+            `}</style>
             <MapContainer 
                 center={defaultCenter} 
                 zoom={10} 
@@ -74,17 +128,56 @@ const Map: React.FC<MapProps> = ({ fires, evacuationRoute, broadcastAlerts = [],
                 {/* Map click handler for placing alerts */}
                 <MapClickHandler onMapClick={onMapClick} isPlacingAlert={isPlacingAlert} />
 
-                {/* Fire markers */}
+                {/* Fire markers - custom report GIF */}
                 {fires.map((fire) => (
-                    <Marker key={fire.id} position={[fire.latitude, fire.longitude]}>
+                    <Marker 
+                        key={fire.id} 
+                        position={[fire.latitude, fire.longitude]}
+                        icon={fireIcon}
+                    >
                         <Popup>
-                            <strong>{fire.riskLevel}</strong><br />
-                            {fire.message}
+                            <div className="font-semibold text-red-700">
+                                FIRE REPORT
+                            </div>
+                            <div className="text-sm mt-1">
+                                <strong>Risk Level:</strong> {fire.riskLevel}<br />
+                                <strong>Details:</strong> {fire.message}
+                            </div>
                         </Popup>
                     </Marker>
                 ))}
 
-                {/* Broadcast alert circles */}
+                {/* Sensor markers - custom sensor GIF */}
+                {sensors.map((sensor) => (
+                    <Marker 
+                        key={sensor.id} 
+                        position={[sensor.latitude, sensor.longitude]}
+                        icon={sensorIcon}
+                    >
+                        <Popup>
+                            <div style={{ color: getSensorStatusColor(sensor.status) }} className="font-semibold">
+                                SENSOR: {sensor.name}
+                            </div>
+                            <div className="text-sm mt-2 space-y-1">
+                                <div>
+                                    <strong>Status:</strong>{' '}
+                                    <span style={{ color: getSensorStatusColor(sensor.status) }}>
+                                        {sensor.status}
+                                    </span>
+                                </div>
+                                <div><strong>Health:</strong> {sensor.health}%</div>
+                                <div><strong>Temperature:</strong> {sensor.temperature}°C</div>
+                                <div><strong>Humidity:</strong> {sensor.humidity}%</div>
+                                <div><strong>Battery:</strong> {sensor.battery}%</div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                    Last ping: {new Date(sensor.lastPing).toLocaleTimeString()}
+                                </div>
+                            </div>
+                        </Popup>
+                    </Marker>
+                ))}
+
+                {/* Broadcast alert circles and markers */}
                 {broadcastAlerts.map((alert) => (
                     <React.Fragment key={alert.id}>
                         <Circle
@@ -97,7 +190,7 @@ const Map: React.FC<MapProps> = ({ fires, evacuationRoute, broadcastAlerts = [],
                                 weight: 2,
                             }}
                         />
-                        <Marker position={alert.position}>
+                        <Marker position={alert.position} icon={alertIcon}>
                             <Popup>
                                 <div className="font-semibold text-red-700">
                                     {alert.priority} ALERT
