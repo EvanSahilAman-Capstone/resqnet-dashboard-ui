@@ -78,9 +78,9 @@ const Sensors: React.FC = () => {
         };
 
         fetchSensors();
-        const interval = setInterval(fetchSensors, 10000);
+        const interval = setInterval(fetchSensors, 5000);
         return () => clearInterval(interval);
-    });
+    }, []);
 
     return (
         <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-gray-50">
