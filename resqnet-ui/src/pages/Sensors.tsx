@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useApi } from '../utils/api';
 
 export interface Sensor {
     id: string;
@@ -7,20 +8,20 @@ export interface Sensor {
     status: 'ONLINE' | 'OFFLINE' | 'WARNING' | 'ERROR';
     latitude: number;
     longitude: number;
-    health: number; // 0-100%
+    health: number;
     temperature: number;
     humidity: number;
-    battery: number; // 0-100%
-    lastPing: string; // ISO timestamp
-    containerId?: string; // Docker container reference
+    battery: number;
+    lastPing: string;
+    containerId?: string;
 }
 
 const Sensors: React.FC = () => {
+    const { fetchWithAuth } = useApi();
     const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null);
     const [sensors, setSensors] = useState<Sensor[]>([]); 
     const [loading, setLoading] = useState(true);
 
-    // Status colors for badges
     const getStatusColor = (status: Sensor['status']) => {
         switch (status) {
             case 'ONLINE': return 'bg-green-100 text-green-800';
@@ -31,10 +32,7 @@ const Sensors: React.FC = () => {
         }
     };
 
-    // Maps backend sensor data to UI sensor page
     const mapBackendToSensor = (backend: any): Sensor => {
-
-        // Uses 'last seen' to determine if sensor is regularly sending data
         const ageSec = Date.now() / 1000 - backend.last_seen;
         let status: Sensor['status'] = 'OFFLINE';
         if (ageSec < 60) status = 'ONLINE';
@@ -46,10 +44,10 @@ const Sensors: React.FC = () => {
             status,
             latitude: Number(backend.lat),
             longitude: Number(backend.lng),
-            health: 100,                        // hardcoded for now
+            health: 100,
             temperature: Number(backend.temperature),
             humidity: backend.humidity,
-            battery: 100,                       // hardcoded for now
+            battery: 100,
             lastPing: new Date(backend.last_seen * 1000).toISOString(),
         };
     };
@@ -57,8 +55,7 @@ const Sensors: React.FC = () => {
     useEffect(() => {
         const fetchSensors = async () => {
             try {
-                const res = await fetch('http://localhost:8000/sensors');
-                const data = await res.json();
+                const data = await fetchWithAuth('/sensors');
                 const mapped: Sensor[] = data.map(mapBackendToSensor);
                 setSensors(mapped);
 
@@ -84,7 +81,6 @@ const Sensors: React.FC = () => {
 
     return (
         <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-gray-50">
-            {/* LEFT: Sensors List */}
             <div className="lg:w-1/3 w-full p-6 space-y-6 overflow-y-auto">
                 <div className="flex justify-between items-center">
                     <h2 className="text-3xl font-extrabold text-gray-900">
@@ -94,7 +90,7 @@ const Sensors: React.FC = () => {
                         to="/" 
                         className="text-blue-600 hover:text-blue-800 font-medium"
                     >
-                        ← Back to Dashboard
+                        Back to Dashboard
                     </Link>
                 </div>
 
@@ -144,9 +140,9 @@ const Sensors: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                                    <div>🌡️ {sensor.temperature}°C</div>
-                                    <div>💧 {sensor.humidity}%</div>
-                                    <div>🔋 {sensor.battery}%</div>
+                                    <div>{sensor.temperature}C</div>
+                                    <div>{sensor.humidity}%</div>
+                                    <div>{sensor.battery}%</div>
                                     <div className="text-xs">
                                         {new Date(sensor.lastPing).toLocaleTimeString()}
                                     </div>
@@ -158,7 +154,6 @@ const Sensors: React.FC = () => {
                 
             </div>
 
-            {/* RIGHT: Selected Sensor Details */}
             <div className="lg:w-2/3 w-full p-6">
                 {selectedSensor ? (
                     <div className="bg-white shadow-xl rounded-xl p-8 h-full flex flex-col">
@@ -179,7 +174,6 @@ const Sensors: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Health Progress Bar */}
                         <div className="mb-8">
                             <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
                                 <span>Health Status</span>
@@ -197,26 +191,24 @@ const Sensors: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Key Metrics Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                             <div>
-                                <h4 className="font-semibold text-gray-900 mb-3">📍 Position</h4>
+                                <h4 className="font-semibold text-gray-900 mb-3">Position</h4>
                                 <div className="space-y-2 text-sm">
                                     <div>Latitude: <span className="font-mono">{selectedSensor.latitude.toFixed(6)}</span></div>
                                     <div>Longitude: <span className="font-mono">{selectedSensor.longitude.toFixed(6)}</span></div>
                                 </div>
                             </div>
                             <div>
-                                <h4 className="font-semibold text-gray-900 mb-3">📊 Readings</h4>
+                                <h4 className="font-semibold text-gray-900 mb-3">Readings</h4>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>🌡️ Temp: <span className="font-bold">{selectedSensor.temperature}°C</span></div>
-                                    <div>💧 Humidity: <span className="font-bold">{selectedSensor.humidity}%</span></div>
-                                    <div>🔋 Battery: <span className="font-bold">{selectedSensor.battery}%</span></div>
+                                    <div>Temp: <span className="font-bold">{selectedSensor.temperature}C</span></div>
+                                    <div>Humidity: <span className="font-bold">{selectedSensor.humidity}%</span></div>
+                                    <div>Battery: <span className="font-bold">{selectedSensor.battery}%</span></div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Last Ping & Container Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                             <div>
                                 <h4 className="font-semibold text-gray-900 mb-2">Last Ping</h4>

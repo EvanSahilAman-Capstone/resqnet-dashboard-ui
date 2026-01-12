@@ -5,16 +5,17 @@ import FireReportCard from "../components/FireReportCard";
 import { useLocalData } from "../hooks/useLocalData.ts";
 import type { BroadcastMessage } from "../components/BroadcastForm.tsx";
 import BroadcastForm from "../components/BroadcastForm.tsx";
+import { useApi } from "../utils/api";
 
 const Dashboard: React.FC = () => {
   const { fires, evacRoute, loading } = useLocalData();
+  const { fetchWithAuth } = useApi();
   const [broadcastAlerts, setBroadcastAlerts] = useState<BroadcastAlert[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [isPlacingAlert, setIsPlacingAlert] = useState(false);
   const [pendingBroadcast, setPendingBroadcast] = useState<BroadcastMessage | null>(null);
   const [broadcastLoading, setBroadcastLoading] = useState(false);
 
-  // Maps backend sensor data to Map sensor interface
   const mapBackendToSensor = (backend: any): Sensor => {
     const ageSec = Date.now() / 1000 - backend.last_seen;
     let status: Sensor['status'] = 'OFFLINE';
@@ -35,12 +36,10 @@ const Dashboard: React.FC = () => {
     };
   };
 
-  // Fetch sensors
   useEffect(() => {
     const fetchSensors = async () => {
       try {
-        const res = await fetch('http://localhost:8000/sensors');
-        const data = await res.json();
+        const data = await fetchWithAuth('/sensors');
         const mapped: Sensor[] = data.map(mapBackendToSensor);
         setSensors(mapped);
       } catch (err) {
@@ -53,12 +52,10 @@ const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch existing broadcasts on mount
   useEffect(() => {
     const fetchBroadcasts = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/broadcasts');
-        const data = await res.json();
+        const data = await fetchWithAuth('/broadcasts');
         const alerts: BroadcastAlert[] = data.map((b: any, idx: number) => ({
           id: b._id || `broadcast-${idx}`,
           position: b.coordinates || [44.5, -79.5],
@@ -81,11 +78,9 @@ const Dashboard: React.FC = () => {
     alert('Click on the map to place the broadcast alert location');
   };
 
-  // Refresh broadcasts from server
   const refreshBroadcasts = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/broadcasts');
-      const data = await res.json();
+      const data = await fetchWithAuth('/broadcasts');
       const alerts: BroadcastAlert[] = data.map((b: any) => ({
         id: b._id || b.id,
         position: b.coordinates || [44.5, -79.5],
@@ -99,7 +94,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Call refreshBroadcasts every 10 seconds to sync with Alerts page changes
   useEffect(() => {
     const interval = setInterval(refreshBroadcasts, 10000);
     return () => clearInterval(interval);
@@ -118,15 +112,10 @@ const Dashboard: React.FC = () => {
         priority: pendingBroadcast.priority.toLowerCase(),
       };
 
-      const res = await fetch('http://127.0.0.1:8000/broadcast', {
+      const result = await fetchWithAuth('/broadcast', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(broadcastData),
       });
-
-      const result = await res.json();
 
       if (result.status === 'success') {
         const newAlert: BroadcastAlert = {
@@ -163,18 +152,16 @@ const Dashboard: React.FC = () => {
     <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-gray-50">
       <div className="lg:w-1/3 w-full p-6 space-y-8 overflow-y-auto">
 
-        {/* BROADCAST FORM COMPONENT */}
         <div className="bg-white shadow-lg rounded-xl p-6">
             <h3 className="text-2xl font-semibold text-red-700 mb-6">Broadcast Alert</h3>
             {isPlacingAlert && (
               <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded-lg text-sm font-semibold">
-                📍 Click on the map to place alert location
+                Click on the map to place alert location
               </div>
             )}
             <BroadcastForm onSubmit={handleBroadcast} loading={broadcastLoading} />
         </div>
 
-        {/* LIVE STATUS SECTION */}
         <div className="bg-white shadow-lg rounded-xl p-6">
           <h3 className="text-2xl font-semibold text-gray-900 mb-4">
             Live Status
@@ -207,7 +194,6 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* MAP COMPONENT */}
       <div className="lg:w-2/3 w-full p-6">
         <div className="bg-white w-full h-full rounded-xl shadow-xl p-1">
           <Map 

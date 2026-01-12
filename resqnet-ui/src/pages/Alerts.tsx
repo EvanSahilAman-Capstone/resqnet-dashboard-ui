@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AlertCard from "../components/AlertCard";
 import FireReportCard from "../components/FireReportCard";
+import { useApi } from "../utils/api";
 
 interface BroadcastAlert {
   _id?: string;
@@ -21,18 +22,16 @@ interface FireReport {
   timestamp: string;
 }
 
-
 function Alerts() {
+  const { fetchWithAuth } = useApi();
   const [alerts, setAlerts] = useState<BroadcastAlert[]>([]);
   const [fireReports, setFireReports] = useState<FireReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportsLoading, setReportsLoading] = useState(true);
 
-  // Fetch alerts from backend
   const fetchAlerts = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/broadcasts");
-      const data = await res.json();
+      const data = await fetchWithAuth("/broadcasts");
       console.log("Fetched alerts:", data);
       setAlerts(data);
     } catch (err) {
@@ -42,11 +41,9 @@ function Alerts() {
     }
   };
 
-  // Fetch fire reports from backend
   const fetchFireReports = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/fires");
-      const data = await res.json();
+      const data = await fetchWithAuth("/fires");
       console.log("Fetched fire reports:", data);
       setFireReports(data);
     } catch (err) {
@@ -61,41 +58,30 @@ function Alerts() {
     fetchFireReports();
   }, []);
 
-  // Delete alert
   const handleDelete = async (id: string) => {
     console.log("Deleting alert with ID:", id);
     
     try {
-      const res = await fetch(`http://127.0.0.1:8000/broadcasts/${id}`, {
+      const result = await fetchWithAuth(`/broadcasts/${id}`, {
         method: "DELETE",
       });
 
-      const result = await res.json();
       console.log("Delete response:", result);
-
-      if (res.ok) {
-        setAlerts(alerts.filter((alert) => alert._id !== id));
-        alert("Alert deleted successfully");
-      } else {
-        alert(`Failed to delete alert: ${result.detail || 'Unknown error'}`);
-      }
+      setAlerts(alerts.filter((alert) => alert._id !== id));
+      alert("Alert deleted successfully");
     } catch (err) {
       console.error("Delete error:", err);
       alert("Error deleting alert");
     }
   };
 
-  // Update alert
   const handleUpdate = async (id: string, updatedAlert: BroadcastAlert) => {
     console.log("Updating alert with ID:", id);
     console.log("Updated data:", updatedAlert);
     
     try {
-      const res = await fetch(`http://127.0.0.1:8000/broadcasts/${id}`, {
+      const result = await fetchWithAuth(`/broadcasts/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           message: updatedAlert.message,
           radius: updatedAlert.radius,
@@ -105,26 +91,19 @@ function Alerts() {
         }),
       });
 
-      const result = await res.json();
       console.log("Update response:", result);
-
-      if (res.ok) {
-        setAlerts(
-          alerts.map((alert) =>
-            alert._id === id ? { ...result.broadcast, _id: id } : alert
-          )
-        );
-        alert("Alert updated successfully");
-      } else {
-        alert(`Failed to update alert: ${result.detail || 'Unknown error'}`);
-      }
+      setAlerts(
+        alerts.map((alert) =>
+          alert._id === id ? { ...result.broadcast, _id: id } : alert
+        )
+      );
+      alert("Alert updated successfully");
     } catch (err) {
       console.error("Update error:", err);
       alert("Error updating alert");
     }
   };
 
-  // Delete fire report
   const handleDeleteReport = (reportId: string) => {
     if (confirm("Are you sure you want to delete this fire report?")) {
       setFireReports(fireReports.filter((report) => report.report_id !== reportId));
@@ -132,7 +111,6 @@ function Alerts() {
     }
   };
 
-  // Verify fire report (dummy function)
   const handleVerifyReport = (reportId: string) => {
     alert("Fire report verified!");
   };
@@ -141,7 +119,6 @@ function Alerts() {
     <main className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* BROADCAST ALERTS SECTION */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-6">
             Broadcast Alerts Management
@@ -167,7 +144,6 @@ function Alerts() {
           )}
         </div>
 
-        {/* FIRE REPORTS SECTION */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-6">
             Fire Reports Verification
@@ -193,7 +169,6 @@ function Alerts() {
                     timestamp={report.timestamp}
                   />
                   
-                  {/* Verify and Delete Buttons */}
                   <div className="p-4 flex gap-2 border-t border-gray-200">
                     <button
                       onClick={() => handleVerifyReport(report.report_id)}
