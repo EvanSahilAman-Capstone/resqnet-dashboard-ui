@@ -29,29 +29,18 @@ function Alerts() {
   const [loading, setLoading] = useState(true);
   const [reportsLoading, setReportsLoading] = useState(true);
 
-  const fetchAlerts = async () => {
-    try {
-      const data = await fetchWithAuth("/broadcasts");
-      console.log("Fetched alerts:", data);
-      setAlerts(data);
-    } catch (err) {
-      console.error("Failed to fetch alerts:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchAlerts = async () => {
+  const data = await fetchWithAuth("/broadcasts");
+  console.log("Fetched alerts:", data);
+  setAlerts(data.broadcasts || []);   // 
+};
 
-  const fetchFireReports = async () => {
-    try {
-      const data = await fetchWithAuth("/fires");
-      console.log("Fetched fire reports:", data);
-      setFireReports(data);
-    } catch (err) {
-      console.error("Failed to fetch fire reports:", err);
-    } finally {
-      setReportsLoading(false);
-    }
-  };
+const fetchFireReports = async () => {
+  const data = await fetchWithAuth("/fires");
+  console.log("Fetched fire reports:", data);
+  setFireReports(data);               // backend already returns a list
+};
+
 
   useEffect(() => {
     fetchAlerts();
