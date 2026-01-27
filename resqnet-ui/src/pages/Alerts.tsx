@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import AlertCard from "../components/AlertCard";
 import FireReportCard from "../components/FireReportCard";
 import { useApi } from "../utils/api";
@@ -18,7 +18,7 @@ interface FireReport {
   hazard_type: string;
   uploading_user: string;
   coordinates: [number, number];
-  severity: "low" | "medium" | "high";  
+  severity: "low" | "medium" | "high";
   timestamp: string;
 }
 
@@ -29,27 +29,40 @@ function Alerts() {
   const [loading, setLoading] = useState(true);
   const [reportsLoading, setReportsLoading] = useState(true);
 
-const fetchAlerts = async () => {
-  const data = await fetchWithAuth("/broadcasts");
-  console.log("Fetched alerts:", data);
-  setAlerts(data.broadcasts || []);   // 
-};
+  const fetchAlerts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await fetchWithAuth("/broadcasts");
+      console.log("Fetched alerts:", data);
+      setAlerts(data.broadcasts || []);
+    } catch (err) {
+      console.error("Failed to fetch alerts:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchWithAuth]);
 
-const fetchFireReports = async () => {
-  const data = await fetchWithAuth("/fires");
-  console.log("Fetched fire reports:", data);
-  setFireReports(data);               // backend already returns a list
-};
-
+  const fetchFireReports = useCallback(async () => {
+    try {
+      setReportsLoading(true);
+      const data = await fetchWithAuth("/fires");
+      console.log("Fetched fire reports:", data);
+      setFireReports(data || []);
+    } catch (err) {
+      console.error("Failed to fetch fire reports:", err);
+    } finally {
+      setReportsLoading(false);
+    }
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     fetchAlerts();
     fetchFireReports();
-  }, []);
+  }, [fetchAlerts, fetchFireReports]);
 
   const handleDelete = async (id: string) => {
     console.log("Deleting alert with ID:", id);
-    
+
     try {
       const result = await fetchWithAuth(`/broadcasts/${id}`, {
         method: "DELETE",
@@ -67,7 +80,7 @@ const fetchFireReports = async () => {
   const handleUpdate = async (id: string, updatedAlert: BroadcastAlert) => {
     console.log("Updating alert with ID:", id);
     console.log("Updated data:", updatedAlert);
-    
+
     try {
       const result = await fetchWithAuth(`/broadcasts/${id}`, {
         method: "PUT",
@@ -95,7 +108,9 @@ const fetchFireReports = async () => {
 
   const handleDeleteReport = (reportId: string) => {
     if (confirm("Are you sure you want to delete this fire report?")) {
-      setFireReports(fireReports.filter((report) => report.report_id !== reportId));
+      setFireReports(
+        fireReports.filter((report) => report.report_id !== reportId)
+      );
       alert("Fire report deleted");
     }
   };
@@ -107,7 +122,6 @@ const fetchFireReports = async () => {
   return (
     <main className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
-        
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-6">
             Broadcast Alerts Management
@@ -138,7 +152,9 @@ const fetchFireReports = async () => {
             Fire Reports Verification
           </h1>
 
-          {reportsLoading && <p className="text-gray-500">Loading fire reports...</p>}
+          {reportsLoading && (
+            <p className="text-gray-500">Loading fire reports...</p>
+          )}
 
           {!reportsLoading && fireReports.length === 0 && (
             <p className="text-gray-500">No fire reports found.</p>
@@ -147,7 +163,10 @@ const fetchFireReports = async () => {
           {!reportsLoading && fireReports.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {fireReports.map((report) => (
-                <div key={report.report_id} className="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div
+                  key={report.report_id}
+                  className="bg-white rounded-xl shadow-lg overflow-hidden"
+                >
                   <FireReportCard
                     report_id={report.report_id}
                     photo_link={report.photo_link}
@@ -157,7 +176,7 @@ const fetchFireReports = async () => {
                     severity={report.severity}
                     timestamp={report.timestamp}
                   />
-                  
+
                   <div className="p-4 flex gap-2 border-t border-gray-200">
                     <button
                       onClick={() => handleVerifyReport(report.report_id)}
@@ -177,7 +196,6 @@ const fetchFireReports = async () => {
             </div>
           )}
         </div>
-
       </div>
     </main>
   );

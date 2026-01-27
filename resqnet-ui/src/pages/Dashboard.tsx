@@ -106,7 +106,6 @@ const Dashboard: React.FC = () => {
   const handleBroadcast = (data: BroadcastMessage) => {
     setPendingBroadcast(data);
     setIsPlacingAlert(true);
-    alert("Click on the map to place the broadcast alert location");
   };
 
   // Handle placing broadcast on the map and sending to backend
@@ -129,24 +128,15 @@ const Dashboard: React.FC = () => {
         body: JSON.stringify(broadcastData),
       });
 
-      if (result.status === "success") {
-        const newAlert: BroadcastAlert = {
-          id: result.broadcast_id,
-          position: [lat, lng],
-          radius: pendingBroadcast.radius,
-          priority: pendingBroadcast.priority,
-          message: pendingBroadcast.message,
-        };
+      const newAlert: BroadcastAlert = {
+        id: result.broadcast_id,
+        position: [lat, lng],
+        radius: pendingBroadcast.radius,
+        priority: pendingBroadcast.priority,
+        message: pendingBroadcast.message,
+      };
 
-        setBroadcastAlerts((prev) => [...prev, newAlert]);
-        alert(
-          `Broadcast sent successfully!\n\nMessage: ${pendingBroadcast.message}\nLocation: [${lat.toFixed(
-            4
-          )}, ${lng.toFixed(4)}]\nRadius: ${pendingBroadcast.radius}km`
-        );
-      } else {
-        alert("Failed to send broadcast");
-      }
+      setBroadcastAlerts((prev) => [...prev, newAlert]);
     } catch (err) {
       console.error("Broadcast error:", err);
       alert("Error sending broadcast");
