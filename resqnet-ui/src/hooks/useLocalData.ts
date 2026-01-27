@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'; 
+import { useState, useEffect } from 'react';
+import { useApi } from '../utils/api';
 
-// Match the backend schema
 export interface FireReport {
     report_id: string;
     photo_link: string;
@@ -11,7 +11,6 @@ export interface FireReport {
     timestamp: string;
 }
 
-// Keep WildfireEvent for the Map component
 export interface WildfireEvent {
     id: string; 
     latitude: number;
@@ -21,6 +20,7 @@ export interface WildfireEvent {
 }
 
 export const useLocalData = () => {
+   const { fetchWithAuth } = useApi();
    const [fires, setFires] = useState<FireReport[]>([]);
    const [evacRoute, setEvacRoute] = useState<[number, number][]>([]);
    const [loading, setLoading] = useState(true);
@@ -28,11 +28,11 @@ export const useLocalData = () => {
    useEffect(() => {
        const fetchFires = async () => {
            try {
-               const res = await fetch("http://127.0.0.1:8000/fires");
-               const data: FireReport[] = await res.json();
+               const data: FireReport[] = await fetchWithAuth("/fires");
                setFires(data);
            } catch (err) {
                console.error("Failed to fetch fires:", err);
+               setFires([]);
            } finally {
                setLoading(false);
            }

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import AlertCard from "../components/AlertCard";
 import FireReportCard from "../components/FireReportCard";
+import { useApi } from "../utils/api";
 
 interface BroadcastAlert {
   _id?: string;
@@ -17,85 +18,72 @@ interface FireReport {
   hazard_type: string;
   uploading_user: string;
   coordinates: [number, number];
-  severity: "low" | "medium" | "high";  
+  severity: "low" | "medium" | "high";
   timestamp: string;
 }
 
-
 function Alerts() {
+  const { fetchWithAuth } = useApi();
   const [alerts, setAlerts] = useState<BroadcastAlert[]>([]);
   const [fireReports, setFireReports] = useState<FireReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportsLoading, setReportsLoading] = useState(true);
 
-  // Fetch alerts from backend
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/broadcasts");
-      const data = await res.json();
+      setLoading(true);
+      const data = await fetchWithAuth("/broadcasts");
       console.log("Fetched alerts:", data);
-      setAlerts(data);
+      setAlerts(data.broadcasts || []);
     } catch (err) {
       console.error("Failed to fetch alerts:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchWithAuth]);
 
-  // Fetch fire reports from backend
-  const fetchFireReports = async () => {
+  const fetchFireReports = useCallback(async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/fires");
-      const data = await res.json();
+      setReportsLoading(true);
+      const data = await fetchWithAuth("/fires");
       console.log("Fetched fire reports:", data);
-      setFireReports(data);
+      setFireReports(data || []);
     } catch (err) {
       console.error("Failed to fetch fire reports:", err);
     } finally {
       setReportsLoading(false);
     }
-  };
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     fetchAlerts();
     fetchFireReports();
-  }, []);
+  }, [fetchAlerts, fetchFireReports]);
 
-  // Delete alert
   const handleDelete = async (id: string) => {
     console.log("Deleting alert with ID:", id);
-    
+
     try {
-      const res = await fetch(`http://127.0.0.1:8000/broadcasts/${id}`, {
+      const result = await fetchWithAuth(`/broadcasts/${id}`, {
         method: "DELETE",
       });
 
-      const result = await res.json();
       console.log("Delete response:", result);
-
-      if (res.ok) {
-        setAlerts(alerts.filter((alert) => alert._id !== id));
-        alert("Alert deleted successfully");
-      } else {
-        alert(`Failed to delete alert: ${result.detail || 'Unknown error'}`);
-      }
+      setAlerts(alerts.filter((alert) => alert._id !== id));
+      alert("Alert deleted successfully");
     } catch (err) {
       console.error("Delete error:", err);
       alert("Error deleting alert");
     }
   };
 
-  // Update alert
   const handleUpdate = async (id: string, updatedAlert: BroadcastAlert) => {
     console.log("Updating alert with ID:", id);
     console.log("Updated data:", updatedAlert);
-    
+
     try {
-      const res = await fetch(`http://127.0.0.1:8000/broadcasts/${id}`, {
+      const result = await fetchWithAuth(`/broadcasts/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           message: updatedAlert.message,
           radius: updatedAlert.radius,
@@ -105,34 +93,28 @@ function Alerts() {
         }),
       });
 
-      const result = await res.json();
       console.log("Update response:", result);
-
-      if (res.ok) {
-        setAlerts(
-          alerts.map((alert) =>
-            alert._id === id ? { ...result.broadcast, _id: id } : alert
-          )
-        );
-        alert("Alert updated successfully");
-      } else {
-        alert(`Failed to update alert: ${result.detail || 'Unknown error'}`);
-      }
+      setAlerts(
+        alerts.map((alert) =>
+          alert._id === id ? { ...result.broadcast, _id: id } : alert
+        )
+      );
+      alert("Alert updated successfully");
     } catch (err) {
       console.error("Update error:", err);
       alert("Error updating alert");
     }
   };
 
-  // Delete fire report
   const handleDeleteReport = (reportId: string) => {
     if (confirm("Are you sure you want to delete this fire report?")) {
-      setFireReports(fireReports.filter((report) => report.report_id !== reportId));
+      setFireReports(
+        fireReports.filter((report) => report.report_id !== reportId)
+      );
       alert("Fire report deleted");
     }
   };
 
-  // Verify fire report (dummy function)
   const handleVerifyReport = (reportId: string) => {
     alert("Fire report verified!");
   };
@@ -140,8 +122,6 @@ function Alerts() {
   return (
     <main className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
-        
-        {/* BROADCAST ALERTS SECTION */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-6">
             Broadcast Alerts Management
@@ -167,13 +147,14 @@ function Alerts() {
           )}
         </div>
 
-        {/* FIRE REPORTS SECTION */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-6">
             Fire Reports Verification
           </h1>
 
-          {reportsLoading && <p className="text-gray-500">Loading fire reports...</p>}
+          {reportsLoading && (
+            <p className="text-gray-500">Loading fire reports...</p>
+          )}
 
           {!reportsLoading && fireReports.length === 0 && (
             <p className="text-gray-500">No fire reports found.</p>
@@ -182,7 +163,10 @@ function Alerts() {
           {!reportsLoading && fireReports.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {fireReports.map((report) => (
-                <div key={report.report_id} className="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div
+                  key={report.report_id}
+                  className="bg-white rounded-xl shadow-lg overflow-hidden"
+                >
                   <FireReportCard
                     report_id={report.report_id}
                     photo_link={report.photo_link}
@@ -192,8 +176,7 @@ function Alerts() {
                     severity={report.severity}
                     timestamp={report.timestamp}
                   />
-                  
-                  {/* Verify and Delete Buttons */}
+
                   <div className="p-4 flex gap-2 border-t border-gray-200">
                     <button
                       onClick={() => handleVerifyReport(report.report_id)}
@@ -213,7 +196,6 @@ function Alerts() {
             </div>
           )}
         </div>
-
       </div>
     </main>
   );

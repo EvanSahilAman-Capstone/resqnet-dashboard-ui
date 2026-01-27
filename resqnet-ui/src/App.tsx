@@ -6,6 +6,7 @@ import Alerts from './pages/Alerts'
 // import Settings from './pages/Settings'
 import Sensors from './pages/Sensors'
 import { Login } from './pages/Login'
+import Layout from './components/Layout'
 
 function App() {
   const { isLoading, isAuthenticated } = useAuth0();
@@ -27,9 +28,10 @@ function App() {
           <Route path="/*" element={
             <>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/alerts" element={<Alerts />} />
-                <Route path="/sensors" element={<Sensors />} />
+                  <Route index element={<Dashboard />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="alerts" element={<Alerts />} />
+                  <Route path="sensors" element={<Sensors />} />
                 {/* <Route path="/settings" element={<Settings />} /> */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
