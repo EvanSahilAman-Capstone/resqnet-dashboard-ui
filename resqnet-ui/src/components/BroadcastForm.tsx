@@ -55,8 +55,8 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
                     value={broadcast.message}
                     onChange={handleBroadcastChange}
                     rows={2}
-                    placeholder="Immediate evacuation required from Zone A..."
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                    placeholder="Enter message to be broadcast"
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 placeholder-gray-500"
                     required
                 />
             </div>
@@ -72,7 +72,7 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
                         max="50"
                         value={broadcast.radius}
                         onChange={handleRadiusChange}
-                        className="flex-1 h-2 bg-gray-200 rounded-lg accent-red-500"
+                        className="flex-1 h-4 bg-gray-200 rounded-lg accent-purple-900"
                     />
                     <span className="font-mono text-lg">{broadcast.radius} km</span>
                 </div>
@@ -81,7 +81,7 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
 
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Priority</label>
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 items-center">
                     {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const).map((priority) => (
                         <button
                             key={priority}
@@ -89,7 +89,7 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
                             onClick={() => handlePriorityChange(priority)}
                             className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                                 broadcast.priority === priority
-                                    ? 'ring-2 ring-red-500 shadow-lg'
+                                    ? 'shadow-lg'
                                     : 'bg-gray-200 hover:bg-gray-300'
                             } ${priority === 'URGENT' ? 'bg-red-100 text-red-800' : 
                                priority === 'HIGH' ? 'bg-orange-100 text-orange-800' : 
@@ -101,7 +101,6 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
                     ))}
                 </div>
             </div>
-
 
             <button
                 type="submit"
