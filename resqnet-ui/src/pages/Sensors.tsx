@@ -52,7 +52,7 @@ const Sensors: React.FC = () => {
       health: 100, // Backend doesn't provide
       temperature: Number(backend.temperature) || 0,
       humidity: Number(backend.smoke_level) || 0, // ← Map smoke_level to humidity
-      battery: Number(backend.battery_level) || 50 || 100,
+      battery: Number(backend.battery_level) || 100,
       lastPing: new Date((backend.last_seen || 0) * 1000).toISOString(),
       containerId: backend.container_id,
     };
@@ -67,7 +67,7 @@ const Sensors: React.FC = () => {
       const list = Array.isArray(data?.sensors) ? data.sensors : [];
       const mapped = list
         .map(mapBackendToSensor)
-        .filter((s) => s.id !== "unknown"); // Filter junk
+        .filter((s: Sensor) => s.id !== "unknown"); // Filter junk
       console.log("Mapped:", mapped);
 
       setSensors(mapped);

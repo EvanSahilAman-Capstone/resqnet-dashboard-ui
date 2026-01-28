@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import AlertCard from "../components/AlertCard";
 import FireReportCard from "../components/FireReportCard";
 import { useApi } from "../utils/api";
@@ -116,7 +116,8 @@ function Alerts() {
   };
 
   const handleVerifyReport = (reportId: string) => {
-    alert("Fire report verified!");
+    alert("Fire report validated!");
+    console.log(reportId);
   };
 
   return (

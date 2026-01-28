@@ -79,7 +79,7 @@ const Dashboard: React.FC = () => {
         const data = await fetchWithAuth("/broadcasts");
         const list = Array.isArray(data?.broadcasts) ? data.broadcasts : [];
         if (!isMounted) return;
-        const alerts: BroadcastAlert[] = list.map((b: any, idx: number) => ({
+        const alerts: BroadcastAlert[] = list.map((b, idx: number) => ({
           id: b._id || b.id || `broadcast-${idx}`,
           position: b.coordinates || [44.5, -79.5],
           radius: b.radius,

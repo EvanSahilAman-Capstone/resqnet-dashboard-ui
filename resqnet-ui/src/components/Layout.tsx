@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import Sidebar from './SideBar';  // Your slim sidebar
+import Sidebar from './Sidebar';  // Your slim sidebar
 
 const Layout: React.FC = () => {
   return (

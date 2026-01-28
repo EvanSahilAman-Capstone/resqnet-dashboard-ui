@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';  // ← NavLink not Link
 import { 
-  HomeIcon, BellIcon, SignalIcon, Cog6ToothIcon,
+  HomeIcon, BellIcon, SignalIcon,
   UserCircleIcon, ArrowRightEndOnRectangleIcon 
 } from '@heroicons/react/24/outline';
 import Logo from '../assets/logo.jpg'
