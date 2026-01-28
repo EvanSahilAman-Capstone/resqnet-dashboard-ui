@@ -57,7 +57,6 @@ const Dashboard: React.FC = () => {
         setSensors(mapped);
       } catch (err) {
         console.error("Failed to fetch sensors:", err);
-        // keep last known sensors on error
       }
     };
 
@@ -82,14 +81,13 @@ const Dashboard: React.FC = () => {
         const alerts: BroadcastAlert[] = list.map((b: any, idx: number) => ({
           id: b._id || b.id || `broadcast-${idx}`,
           position: b.coordinates || [44.5, -79.5],
-          radius: b.radius,
+          radius: b.radius || 1, // Keep as km
           priority: b.priority.toUpperCase(),
           message: b.message,
         }));
         setBroadcastAlerts(alerts);
       } catch (err) {
         console.error("Failed to fetch broadcasts:", err);
-        // keep last known alerts on error
       }
     };
 
@@ -101,6 +99,11 @@ const Dashboard: React.FC = () => {
       clearInterval(interval);
     };
   }, [fetchWithAuth]);
+
+  // Handle live form changes (slider, priority, message)
+  const handleBroadcastDraftChange = (draft: BroadcastMessage) => {
+    setPendingBroadcast(draft); // Update live so map preview changes immediately
+  };
 
   // Handle broadcast form submission (step 1 – choose on map)
   const handleBroadcast = (data: BroadcastMessage) => {
@@ -131,7 +134,7 @@ const Dashboard: React.FC = () => {
       const newAlert: BroadcastAlert = {
         id: result.broadcast_id,
         position: [lat, lng],
-        radius: pendingBroadcast.radius,
+        radius: pendingBroadcast.radius, // km
         priority: pendingBroadcast.priority,
         message: pendingBroadcast.message,
       };
@@ -168,7 +171,11 @@ const Dashboard: React.FC = () => {
               Click on the map to place alert location
             </div>
           )}
-          <BroadcastForm onSubmit={handleBroadcast} loading={broadcastLoading} />
+          <BroadcastForm
+            onSubmit={handleBroadcast}
+            onChange={handleBroadcastDraftChange}
+            loading={broadcastLoading}
+          />
         </div>
 
         {/* Fire reports */}
@@ -210,6 +217,8 @@ const Dashboard: React.FC = () => {
             sensors={sensors}
             onMapClick={handleMapClick}
             isPlacingAlert={isPlacingAlert}
+            draftRadiusKm={pendingBroadcast?.radius ?? 1}
+            draftPriority={pendingBroadcast?.priority ?? 'LOW'}
           />
         </div>
       </div>
@@ -218,3 +227,4 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+
