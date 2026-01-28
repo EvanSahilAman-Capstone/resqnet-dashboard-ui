@@ -1,18 +1,15 @@
 import React, { useState } from 'react'; 
 
-
 export interface BroadcastMessage {
     message: string;
     radius: number;
     priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 }
 
-
 interface BroadcastFormProps {
     onSubmit: (data: BroadcastMessage) => void;
     loading?: boolean;
 }
-
 
 const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false }) => {
     const [broadcast, setBroadcast] = useState<BroadcastMessage>({
