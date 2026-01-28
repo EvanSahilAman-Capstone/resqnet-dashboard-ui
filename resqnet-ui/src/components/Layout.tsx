@@ -5,7 +5,7 @@ import Sidebar from './SideBar';  // Your slim sidebar
 const Layout: React.FC = () => {
   return (
     <>
-      <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <div className="flex h-screen bg-blue-50 overflow-hidden">
         <Sidebar />
         
         {/* Page content - pushed right */}

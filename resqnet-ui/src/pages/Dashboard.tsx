@@ -157,12 +157,12 @@ const Dashboard: React.FC = () => {
 
   // Render
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-gray-50">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)]">
       {/* Left column: controls and lists */}
       <div className="lg:w-1/3 w-full p-6 space-y-8 overflow-y-auto">
         {/* Broadcast form */}
         <div className="bg-white shadow-lg rounded-xl p-6">
-          <h3 className="text-2xl font-semibold text-red-700 mb-6">Broadcast Alert</h3>
+          <h3 className="text-2xl text-center font-semibold text-red-700 mb-6">Broadcast Alert</h3>
           {isPlacingAlert && (
             <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded-lg text-sm font-semibold">
               Click on the map to place alert location

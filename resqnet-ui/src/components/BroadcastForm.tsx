@@ -45,7 +45,6 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
         onSubmit(broadcast);
     };
 
-
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -60,7 +59,6 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
                     required
                 />
             </div>
-
 
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Radius</label>
@@ -77,7 +75,6 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, loading = false
                     <span className="font-mono text-lg">{broadcast.radius} km</span>
                 </div>
             </div>
-
 
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Priority</label>

@@ -1,4 +1,6 @@
 import React from 'react';
+import { useState, useEffect } from 'react';
+import { useMap } from 'react-leaflet';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -14,6 +16,16 @@ const fireIcon = new L.DivIcon({
     iconSize: [40, 40],
     iconAnchor: [20, 20],
     popupAnchor: [0, -20]
+});
+
+// User location marker (simple blue pin)
+const userIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
 });
 
 // Sensor icon - in assets/sensor.gif
@@ -62,6 +74,53 @@ interface MapProps {
     sensors?: Sensor[];
     onMapClick?: (lat: number, lng: number) => void;
     isPlacingAlert?: boolean;
+}
+
+// Component for centering map on user's position by default
+const UserLocation: React.FC = () => {
+    const [position, setPosition] = useState<L.LatLng | null>(null);
+    const [accuracy, setAccuracy] = useState<number>(0);
+    const map = useMap();
+
+    useEffect(() => {
+        map.locate({ setView: false, watch: false, timeout: 10000, maximumAge: 60000});
+
+        const onLocationFound = (e: L.LocationEvent) => {
+            setPosition(e.latlng);
+            setAccuracy(e.accuracy || 0);
+            map.flyTo(e.latlng, 10);
+        };
+
+        const onLocationError = (e: L.ErrorEvent) => {
+      console.warn('Geolocation failed:', e.message);  // Fallback to default (Oakville)
+    };
+
+    map.on('locationfound', onLocationFound);
+    map.on('locationerror', onLocationError);
+
+    return () => {
+      map.off('locationfound', onLocationFound);
+      map.off('locationerror', onLocationError);
+    };
+  }, [map]);
+
+  return position ? (
+    <>
+      <Marker position={position} icon={userIcon}>
+        <Popup>
+          <div className="font-semibold text-blue-700">You are here</div>
+          <div className="text-sm text-gray-600">Accuracy: {Math.round(accuracy)}m</div>
+        </Popup>
+      </Marker>
+      {accuracy > 0 && (
+        <Circle
+          center={position}
+          radius={accuracy}
+          pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1, weight: 1 }}
+        />
+      )}
+    </>
+  ) : null;
 }
 
 // Component to handle map clicks
@@ -124,6 +183,8 @@ const Map: React.FC<MapProps> = ({ fires, evacuationRoute, broadcastAlerts = [],
                     attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
+
+                <UserLocation />
 
                 {/* Map click handler for placing alerts */}
                 <MapClickHandler onMapClick={onMapClick} isPlacingAlert={isPlacingAlert} />

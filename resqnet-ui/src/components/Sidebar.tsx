@@ -4,6 +4,7 @@ import {
   HomeIcon, BellIcon, SignalIcon, Cog6ToothIcon,
   UserCircleIcon, ArrowRightEndOnRectangleIcon 
 } from '@heroicons/react/24/outline';
+import Logo from '../assets/logo.jpg'
 
 const Sidebar: React.FC = () => {
   return (
@@ -12,7 +13,7 @@ const Sidebar: React.FC = () => {
       {/* Logo */}
       <div className="pt-6">
         <div className="inline-flex size-16 items-center justify-center">
-          <span className="grid size-11 place-content-center rounded-2xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold text-lg shadow-lg border-2 border-white/50" />
+          <img src={Logo} className="size-11 place-content-center rounded-2xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold text-lg shadow-lg border-2 border-white/50" />
         </div>
       </div>
 
@@ -80,28 +81,6 @@ const Sidebar: React.FC = () => {
               <SignalIcon className={`size-6 transition-opacity ${isActive ? 'opacity-100' : 'opacity-75 group-hover:opacity-100'}`} />
               <span className="invisible absolute left-full top-1/2 ms-3 -translate-y-1/2 whitespace-nowrap rounded-xl bg-gray-900/95 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-sm border border-gray-800/50 group-hover:visible z-50">
                 Sensors
-              </span>
-            </>
-          )}
-        </NavLink>
-
-        {/* Settings */}
-        <NavLink 
-          to="/settings"
-          className={({ isActive }) => 
-            `group relative flex justify-center p-3 rounded-xl hover:shadow-md hover:scale-[1.05] transition-all duration-200 active:scale-[0.98] 
-             ${isActive 
-               ? 'bg-blue-50/80 text-blue-600 border-blue-200/60 shadow-md border' 
-               : 'text-gray-600 hover:bg-blue-50/80 hover:text-blue-600 border-transparent'
-             }`
-          }
-          title="Settings"
-        >
-          {({ isActive }) => (
-            <>
-              <Cog6ToothIcon className={`size-6 transition-opacity ${isActive ? 'opacity-100' : 'opacity-75 group-hover:opacity-100'}`} />
-              <span className="invisible absolute left-full top-1/2 ms-3 -translate-y-1/2 whitespace-nowrap rounded-xl bg-gray-900/95 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-sm border border-gray-800/50 group-hover:visible z-50">
-                Settings
               </span>
             </>
           )}
