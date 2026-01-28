@@ -38,22 +38,22 @@ const Sensors: React.FC = () => {
   };
 
   const mapBackendToSensor = (backend: any): Sensor => {
-    const ageSec = Date.now() / 1000 - backend.last_seen;
+    const ageSec = Date.now() / 1000 - backend.last_seen || 99999; // Fallback
     let status: Sensor["status"] = "OFFLINE";
     if (ageSec < 60) status = "ONLINE";
     else if (ageSec < 300) status = "WARNING";
 
     return {
-      id: backend.id,
-      name: backend.id,
+      id: backend.id || "unknown",
+      name: backend.id || "Unknown",
       status,
-      latitude: Number(backend.lat),
-      longitude: Number(backend.lng),
-      health: 100,
-      temperature: Number(backend.temperature),
-      humidity: backend.humidity,
-      battery: 100,
-      lastPing: new Date(backend.last_seen * 1000).toISOString(),
+      latitude: Number(backend.lat) || 0,
+      longitude: Number(backend.lng) || 0,
+      health: 100, // Backend doesn't provide
+      temperature: Number(backend.temperature) || 0,
+      humidity: Number(backend.smoke_level) || 0, // ← Map smoke_level to humidity
+      battery: Number(backend.battery_level) || 50 || 100,
+      lastPing: new Date((backend.last_seen || 0) * 1000).toISOString(),
       containerId: backend.container_id,
     };
   };
@@ -62,22 +62,22 @@ const Sensors: React.FC = () => {
     try {
       setLoading(true);
       const data = await fetchWithAuth("/sensors");
-      console.log("Fetched sensors:", data);
+      console.log("Raw data:", data);
 
-      // If your backend returns { sensors: [...] }
-      const list = Array.isArray(data?.sensors) ? data.sensors : Array.isArray(data) ? data : [];
-      const mapped: Sensor[] = list.map(mapBackendToSensor);
+      const list = Array.isArray(data?.sensors) ? data.sensors : [];
+      const mapped = list
+        .map(mapBackendToSensor)
+        .filter((s) => s.id !== "unknown"); // Filter junk
+      console.log("Mapped:", mapped);
+
       setSensors(mapped);
 
-      setSelectedSensor((prev) => {
-        if (prev) {
-          const updated = mapped.find((s) => s.id === prev.id);
-          return updated ?? prev;
-        }
-        return mapped[0] ?? null;
-      });
+      // Always auto-select first (even on refresh)
+      if (mapped.length > 0) {
+        setSelectedSensor(mapped[0]);
+      }
     } catch (err) {
-      console.error("Failed to fetch sensors", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -85,9 +85,9 @@ const Sensors: React.FC = () => {
 
   useEffect(() => {
     fetchSensors();
-    const interval = setInterval(fetchSensors, 5000);
+    const interval = setInterval(fetchSensors, 10000); // 10s not 5s
     return () => clearInterval(interval);
-  }, [fetchSensors]);
+  }, [fetchSensors]); // Stable callback
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-gray-50">
@@ -141,7 +141,7 @@ const Sensors: React.FC = () => {
                     <h4 className="font-bold text-lg">{sensor.name}</h4>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                        sensor.status
+                        sensor.status,
                       )}`}
                     >
                       {sensor.status}

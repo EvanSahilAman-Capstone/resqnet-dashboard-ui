@@ -11,7 +11,7 @@ const Layout: React.FC = () => {
         {/* Page content - pushed right */}
         <div className="flex-1 flex flex-col overflow-hidden">
             {/* Page-specific content */}
-            <main className="flex-1 overflow-hidden">
+            <main className="flex-1 overflow-y-auto">
             <Outlet />  {/* Renders Dashboard, Alerts, Sensors, etc. */}
             </main>
         </div>
