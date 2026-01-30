@@ -1,6 +1,5 @@
 // Dashboard.tsx
 
-// Imports
 import React, { useState, useEffect } from "react";
 import Map from "../components/Map";
 import type { BroadcastAlert, Sensor } from "../components/Map";
@@ -10,20 +9,22 @@ import type { BroadcastMessage } from "../components/BroadcastForm.tsx";
 import BroadcastForm from "../components/BroadcastForm.tsx";
 import { useApi } from "../utils/api";
 
-// Component
 const Dashboard: React.FC = () => {
-  // Local data and API
-  const { fires, evacRoute, loading } = useLocalData();
+  const { fires, evacRoute, setEvacRoute, loading } = useLocalData() as any;
   const { fetchWithAuth } = useApi();
 
-  // State
   const [broadcastAlerts, setBroadcastAlerts] = useState<BroadcastAlert[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [isPlacingAlert, setIsPlacingAlert] = useState(false);
   const [pendingBroadcast, setPendingBroadcast] = useState<BroadcastMessage | null>(null);
   const [broadcastLoading, setBroadcastLoading] = useState(false);
 
-  // Mapping backend sensor payload to Sensor type
+  const [hasRoute, setHasRoute] = useState(false);
+  const [isSelectingDestination, setIsSelectingDestination] = useState(false);
+  const [destinationPin, setDestinationPin] = useState<[number, number] | null>(null);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [routeSafetyScore, setRouteSafetyScore] = useState<number | undefined>(undefined);
+
   const mapBackendToSensor = (backend: any): Sensor => {
     const ageSec = Date.now() / 1000 - backend.last_seen;
     let status: Sensor["status"] = "OFFLINE";
@@ -44,7 +45,15 @@ const Dashboard: React.FC = () => {
     };
   };
 
-  // Fetch sensors (initial + polling)
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation([pos.coords.latitude, pos.coords.longitude]);
+      },
+      (err) => console.warn("Could not get user location:", err.message)
+    );
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -62,14 +71,12 @@ const Dashboard: React.FC = () => {
 
     fetchSensors();
     const interval = setInterval(fetchSensors, 10000);
-
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
   }, [fetchWithAuth]);
 
-  // Fetch broadcasts (initial + polling)
   useEffect(() => {
     let isMounted = true;
 
@@ -78,11 +85,11 @@ const Dashboard: React.FC = () => {
         const data = await fetchWithAuth("/broadcasts");
         const list = Array.isArray(data?.broadcasts) ? data.broadcasts : [];
         if (!isMounted) return;
-        const alerts: BroadcastAlert[] = list.map((b, idx: number) => ({
+        const alerts: BroadcastAlert[] = list.map((b: any, idx: number) => ({
           id: b._id || b.id || `broadcast-${idx}`,
           position: b.coordinates || [44.5, -79.5],
-          radius: b.radius || 1, // Keep as km
-          priority: b.priority.toUpperCase(),
+          radius: b.radius || 1,
+          priority: (b.priority || "low").toUpperCase(),
           message: b.message,
         }));
         setBroadcastAlerts(alerts);
@@ -93,25 +100,21 @@ const Dashboard: React.FC = () => {
 
     fetchBroadcasts();
     const interval = setInterval(fetchBroadcasts, 10000);
-
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
   }, [fetchWithAuth]);
 
-  // Handle live form changes (slider, priority, message)
   const handleBroadcastDraftChange = (draft: BroadcastMessage) => {
-    setPendingBroadcast(draft); // Update live so map preview changes immediately
+    setPendingBroadcast(draft);
   };
 
-  // Handle broadcast form submission (step 1 – choose on map)
   const handleBroadcast = (data: BroadcastMessage) => {
     setPendingBroadcast(data);
     setIsPlacingAlert(true);
   };
 
-  // Handle placing broadcast on the map and sending to backend
   const handleMapClick = async (lat: number, lng: number) => {
     if (!pendingBroadcast) return;
 
@@ -134,7 +137,7 @@ const Dashboard: React.FC = () => {
       const newAlert: BroadcastAlert = {
         id: result.broadcast_id,
         position: [lat, lng],
-        radius: pendingBroadcast.radius, // km
+        radius: pendingBroadcast.radius,
         priority: pendingBroadcast.priority,
         message: pendingBroadcast.message,
       };
@@ -149,8 +152,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Map fire reports to map events
-  const wildfireEvents = fires.map((fire) => ({
+  const wildfireEvents = fires.map((fire: any) => ({
     id: fire.report_id,
     latitude: fire.coordinates[0],
     longitude: fire.coordinates[1],
@@ -158,14 +160,63 @@ const Dashboard: React.FC = () => {
     message: `${fire.hazard_type} reported by ${fire.uploading_user}`,
   }));
 
-  // Render
+  // Step 1: User clicks "Pin" button
+  const handleStartDestinationSelection = () => {
+    setIsSelectingDestination(true);
+  };
+
+  // Step 2: User clicks on map → auto-fill search bar with lat,lng
+  const handleSelectDestinationOnMap = (lat: number, lng: number) => {
+    setIsSelectingDestination(false);
+    setDestinationPin([lat, lng]);
+    // Search bar auto-fills via useEffect in Map component
+  };
+
+  // Step 3: User clicks "Route" button → generate route
+  const handleRequestRouteFromPinned = async () => {
+    if (!destinationPin) {
+      alert("Please select a destination by clicking Pin, then clicking on the map.");
+      return;
+    }
+    if (!userLocation) {
+      alert("User location not available yet.");
+      return;
+    }
+
+    try {
+      const result = await fetchWithAuth("/api/routing/evacuation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origin: userLocation,
+          destination: destinationPin,
+        }),
+      });
+
+      setEvacRoute(result.route);
+      setHasRoute(true);
+      setRouteSafetyScore(result.safety_score);
+    } catch (err) {
+      console.error("Evacuation route error", err);
+      alert("Could not calculate evacuation route");
+    }
+  };
+
+  const handleCancelRoute = () => {
+    setEvacRoute([]);
+    setDestinationPin(null);
+    setHasRoute(false);
+    setIsSelectingDestination(false);
+    setRouteSafetyScore(undefined);
+  };
+
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)]">
-      {/* Left column: controls and lists */}
       <div className="lg:w-1/3 w-full p-6 space-y-8 overflow-y-auto">
-        {/* Broadcast form */}
         <div className="bg-white shadow-lg rounded-xl p-6">
-          <h3 className="text-2xl text-center font-semibold text-red-700 mb-6">Broadcast Alert</h3>
+          <h3 className="text-2xl text-center font-semibold text-red-700 mb-6">
+            Broadcast Alert
+          </h3>
           {isPlacingAlert && (
             <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded-lg text-sm font-semibold">
               Click on the map to place alert location
@@ -178,7 +229,6 @@ const Dashboard: React.FC = () => {
           />
         </div>
 
-        {/* Fire reports */}
         <div className="bg-white shadow-lg rounded-xl p-6">
           <h3 className="text-2xl font-semibold text-gray-900 mb-4">Live Status</h3>
 
@@ -190,7 +240,7 @@ const Dashboard: React.FC = () => {
 
           {!loading && fires.length > 0 && (
             <div className="space-y-4">
-              {fires.map((fire) => (
+              {fires.map((fire: any) => (
                 <FireReportCard
                   key={fire.report_id}
                   report_id={fire.report_id}
@@ -207,18 +257,25 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Right column: map */}
       <div className="lg:w-2/3 w-full p-6">
         <div className="bg-white w-full h-full rounded-xl shadow-xl p-1">
           <Map
             fires={wildfireEvents}
             evacuationRoute={evacRoute}
+            evacuationSafetyScore={routeSafetyScore}
             broadcastAlerts={broadcastAlerts}
             sensors={sensors}
             onMapClick={handleMapClick}
             isPlacingAlert={isPlacingAlert}
             draftRadiusKm={pendingBroadcast?.radius ?? 1}
-            draftPriority={pendingBroadcast?.priority ?? 'LOW'}
+            draftPriority={pendingBroadcast?.priority ?? "LOW"}
+            onStartDestinationSelection={handleStartDestinationSelection}
+            onSelectDestinationOnMap={handleSelectDestinationOnMap}
+            onRequestRouteFromPinned={handleRequestRouteFromPinned}
+            onCancelRoute={handleCancelRoute}
+            hasActiveRoute={hasRoute}
+            isSelectingDestination={isSelectingDestination}
+            destinationPin={destinationPin}
           />
         </div>
       </div>
@@ -227,4 +284,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-
