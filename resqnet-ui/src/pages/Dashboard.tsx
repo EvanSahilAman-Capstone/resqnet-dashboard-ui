@@ -1,5 +1,3 @@
-// Dashboard.tsx
-
 import React, { useState, useEffect } from "react";
 import Map from "../components/Map";
 import type { BroadcastAlert, Sensor } from "../components/Map";
@@ -47,28 +45,23 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLocation([pos.coords.latitude, pos.coords.longitude]);
-      },
+      (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
       (err) => console.warn("Could not get user location:", err.message)
     );
   }, []);
 
   useEffect(() => {
     let isMounted = true;
-
     const fetchSensors = async () => {
       try {
         const data = await fetchWithAuth("/sensors");
         const list = Array.isArray(data?.sensors) ? data.sensors : [];
         if (!isMounted) return;
-        const mapped: Sensor[] = list.map(mapBackendToSensor);
-        setSensors(mapped);
+        setSensors(list.map(mapBackendToSensor));
       } catch (err) {
         console.error("Failed to fetch sensors:", err);
       }
     };
-
     fetchSensors();
     const interval = setInterval(fetchSensors, 10000);
     return () => {
@@ -79,7 +72,6 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-
     const fetchBroadcasts = async () => {
       try {
         const data = await fetchWithAuth("/broadcasts");
@@ -97,7 +89,6 @@ const Dashboard: React.FC = () => {
         console.error("Failed to fetch broadcasts:", err);
       }
     };
-
     fetchBroadcasts();
     const interval = setInterval(fetchBroadcasts, 10000);
     return () => {
@@ -106,9 +97,8 @@ const Dashboard: React.FC = () => {
     };
   }, [fetchWithAuth]);
 
-  const handleBroadcastDraftChange = (draft: BroadcastMessage) => {
+  const handleBroadcastDraftChange = (draft: BroadcastMessage) =>
     setPendingBroadcast(draft);
-  };
 
   const handleBroadcast = (data: BroadcastMessage) => {
     setPendingBroadcast(data);
@@ -117,32 +107,29 @@ const Dashboard: React.FC = () => {
 
   const handleMapClick = async (lat: number, lng: number) => {
     if (!pendingBroadcast) return;
-
     setIsPlacingAlert(false);
     setBroadcastLoading(true);
-
     try {
       const broadcastData = {
         ...pendingBroadcast,
         coordinates: [lat, lng],
         priority: pendingBroadcast.priority.toLowerCase(),
       };
-
       const result = await fetchWithAuth("/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(broadcastData),
       });
-
-      const newAlert: BroadcastAlert = {
-        id: result.broadcast_id,
-        position: [lat, lng],
-        radius: pendingBroadcast.radius,
-        priority: pendingBroadcast.priority,
-        message: pendingBroadcast.message,
-      };
-
-      setBroadcastAlerts((prev) => [...prev, newAlert]);
+      setBroadcastAlerts((prev) => [
+        ...prev,
+        {
+          id: result.broadcast_id,
+          position: [lat, lng],
+          radius: pendingBroadcast.radius,
+          priority: pendingBroadcast.priority,
+          message: pendingBroadcast.message,
+        },
+      ]);
     } catch (err) {
       console.error("Broadcast error:", err);
       alert("Error sending broadcast");
@@ -160,19 +147,13 @@ const Dashboard: React.FC = () => {
     message: `${fire.hazard_type} reported by ${fire.uploading_user}`,
   }));
 
-  // Step 1: User clicks "Pin" button
-  const handleStartDestinationSelection = () => {
-    setIsSelectingDestination(true);
-  };
+  const handleStartDestinationSelection = () => setIsSelectingDestination(true);
 
-  // Step 2: User clicks on map → auto-fill search bar with lat,lng
   const handleSelectDestinationOnMap = (lat: number, lng: number) => {
     setIsSelectingDestination(false);
     setDestinationPin([lat, lng]);
-    // Search bar auto-fills via useEffect in Map component
   };
 
-  // Step 3: User clicks "Route" button → generate route
   const handleRequestRouteFromPinned = async () => {
     if (!destinationPin) {
       alert("Please select a destination by clicking Pin, then clicking on the map.");
@@ -182,7 +163,6 @@ const Dashboard: React.FC = () => {
       alert("User location not available yet.");
       return;
     }
-
     try {
       const result = await fetchWithAuth("/api/routing/evacuation", {
         method: "POST",
@@ -192,7 +172,6 @@ const Dashboard: React.FC = () => {
           destination: destinationPin,
         }),
       });
-
       setEvacRoute(result.route);
       setHasRoute(true);
       setRouteSafetyScore(result.safety_score);
@@ -211,73 +190,79 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)]">
-      <div className="lg:w-1/3 w-full p-6 space-y-8 overflow-y-auto">
-        <div className="bg-white shadow-lg rounded-xl p-6">
-          <h3 className="text-2xl text-center font-semibold text-red-700 mb-6">
-            Broadcast Alert
-          </h3>
-          {isPlacingAlert && (
-            <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded-lg text-sm font-semibold">
-              Click on the map to place alert location
-            </div>
-          )}
-          <BroadcastForm
-            onSubmit={handleBroadcast}
-            onChange={handleBroadcastDraftChange}
-            loading={broadcastLoading}
-          />
+    <div className="h-screen w-full">
+      <div className="relative h-full w-full">
+
+        {/* Full-area Map */}
+        <Map
+          fires={wildfireEvents}
+          evacuationRoute={evacRoute}
+          evacuationSafetyScore={routeSafetyScore}
+          broadcastAlerts={broadcastAlerts}
+          sensors={sensors}
+          onMapClick={handleMapClick}
+          isPlacingAlert={isPlacingAlert}
+          draftRadiusKm={pendingBroadcast?.radius ?? 1}
+          draftPriority={pendingBroadcast?.priority ?? "LOW"}
+          onStartDestinationSelection={handleStartDestinationSelection}
+          onSelectDestinationOnMap={handleSelectDestinationOnMap}
+          onRequestRouteFromPinned={handleRequestRouteFromPinned}
+          onCancelRoute={handleCancelRoute}
+          hasActiveRoute={hasRoute}
+          isSelectingDestination={isSelectingDestination}
+          destinationPin={destinationPin}
+        />
+
+        {/* Live Status overlay — top-left */}
+        <div className="pointer-events-none absolute top-4 left-4 z-50 w-72">
+          <div className="pointer-events-auto bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl p-4 border border-gray-200 max-h-80 overflow-y-auto">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">
+              🔥 Live Status
+            </h3>
+            {loading && (
+              <p className="text-gray-500 text-xs">Loading fire reports...</p>
+            )}
+            {!loading && fires.length === 0 && (
+              <p className="text-gray-500 text-xs">No active fire reports.</p>
+            )}
+            {!loading && fires.length > 0 && (
+              <div className="space-y-3">
+                {fires.map((fire: any) => (
+                  <FireReportCard
+                    key={fire.report_id}
+                    report_id={fire.report_id}
+                    photo_link={fire.photo_link}
+                    hazard_type={fire.hazard_type}
+                    uploading_user={fire.uploading_user}
+                    coordinates={fire.coordinates}
+                    severity={fire.severity}
+                    timestamp={fire.timestamp}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="bg-white shadow-lg rounded-xl p-6">
-          <h3 className="text-2xl font-semibold text-gray-900 mb-4">Live Status</h3>
-
-          {loading && <p className="text-gray-500">Loading fire reports...</p>}
-
-          {!loading && fires.length === 0 && (
-            <p className="text-gray-500">No active fire reports.</p>
-          )}
-
-          {!loading && fires.length > 0 && (
-            <div className="space-y-4">
-              {fires.map((fire: any) => (
-                <FireReportCard
-                  key={fire.report_id}
-                  report_id={fire.report_id}
-                  photo_link={fire.photo_link}
-                  hazard_type={fire.hazard_type}
-                  uploading_user={fire.uploading_user}
-                  coordinates={fire.coordinates}
-                  severity={fire.severity}
-                  timestamp={fire.timestamp}
-                />
-              ))}
-            </div>
-          )}
+        {/* BroadcastForm overlay — bottom-left */}
+        <div className="pointer-events-none absolute bottom-6 left-4 z-50 w-80">
+          <div className="pointer-events-auto bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl p-4 border border-gray-200">
+            <h3 className="text-lg font-semibold text-red-700 mb-3 text-center">
+              Broadcast Alert
+            </h3>
+            {isPlacingAlert && (
+              <div className="mb-3 p-2 bg-blue-100 text-blue-800 rounded-lg text-xs font-semibold">
+                Click on the map to place alert location
+              </div>
+            )}
+            <BroadcastForm
+              onSubmit={handleBroadcast}
+              onChange={handleBroadcastDraftChange}
+              loading={broadcastLoading}
+            />
+          </div>
         </div>
-      </div>
 
-      <div className="lg:w-2/3 w-full p-6">
-        <div className="bg-white w-full h-full rounded-xl shadow-xl p-1">
-          <Map
-            fires={wildfireEvents}
-            evacuationRoute={evacRoute}
-            evacuationSafetyScore={routeSafetyScore}
-            broadcastAlerts={broadcastAlerts}
-            sensors={sensors}
-            onMapClick={handleMapClick}
-            isPlacingAlert={isPlacingAlert}
-            draftRadiusKm={pendingBroadcast?.radius ?? 1}
-            draftPriority={pendingBroadcast?.priority ?? "LOW"}
-            onStartDestinationSelection={handleStartDestinationSelection}
-            onSelectDestinationOnMap={handleSelectDestinationOnMap}
-            onRequestRouteFromPinned={handleRequestRouteFromPinned}
-            onCancelRoute={handleCancelRoute}
-            hasActiveRoute={hasRoute}
-            isSelectingDestination={isSelectingDestination}
-            destinationPin={destinationPin}
-          />
-        </div>
       </div>
     </div>
   );
