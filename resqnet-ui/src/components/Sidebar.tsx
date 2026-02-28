@@ -1,12 +1,16 @@
 import React from 'react';
-import { NavLink, Link } from 'react-router-dom';  // ← NavLink not Link
+import { NavLink, Link } from 'react-router-dom';
 import { 
   HomeIcon, BellIcon, SignalIcon,
   UserCircleIcon, ArrowRightEndOnRectangleIcon 
 } from '@heroicons/react/24/outline';
-import Logo from '../assets/logo.jpg'
+import Logo from '../assets/logo.jpg';
 
-const Sidebar: React.FC = () => {
+type SidebarProps = {
+  onLogoutClick?: () => void;
+};
+
+const Sidebar: React.FC<SidebarProps> = ({ onLogoutClick }) => {
   return (
     <div className="flex h-screen w-16 flex-col justify-between border-r flex-shrink-0 border-gray-100/50 bg-gradient-to-b from-white/80 to-slate-50/80 shadow-xl backdrop-blur-sm z-40">
       
@@ -87,14 +91,21 @@ const Sidebar: React.FC = () => {
         </NavLink>
       </div>
 
-      {/* Bottom: Profile/Logout (not active) */}
+      {/* Bottom: Profile/Logout */}
       <div className="px-2 py-4 border-t border-gray-100/50 bg-white/50 backdrop-blur-sm space-y-2">
-        <Link to="/profile" className="group relative flex justify-center p-3 rounded-2xl text-gray-600 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 hover:text-indigo-600 hover:shadow-lg hover:scale-[1.05] transition-all duration-200 active:scale-[0.98]">
+        <Link
+          to="/profile"
+          className="group relative flex justify-center p-3 rounded-2xl text-gray-600 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 hover:text-indigo-600 hover:shadow-lg hover:scale-[1.05] transition-all duration-200 active:scale-[0.98]"
+        >
           <UserCircleIcon className="size-6 opacity-75 group-hover:opacity-100" />
         </Link>
-        <Link to="/logout" className="group relative flex justify-center p-3 rounded-2xl text-gray-500 hover:bg-red-50 hover:text-red-600 hover:shadow-lg hover:scale-[1.05] transition-all duration-200 active:scale-[0.98]">
+        <button
+          type="button"
+          onClick={onLogoutClick}
+          className="group relative flex justify-center p-3 rounded-2xl text-gray-500 hover:bg-red-50 hover:text-red-600 hover:shadow-lg hover:scale-[1.05] transition-all duration-200 active:scale-[0.98]"
+        >
           <ArrowRightEndOnRectangleIcon className="size-6 opacity-75 group-hover:opacity-100" />
-        </Link>
+        </button>
       </div>
     </div>
   );
