@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Map from "../components/Map";
 import type { BroadcastAlert, Sensor } from "../components/Map";
-import FireReportCard from "../components/FireReportCard";
 import { useLocalData } from "../hooks/useLocalData.ts";
 import type { BroadcastMessage } from "../components/BroadcastForm.tsx";
-import BroadcastForm from "../components/BroadcastForm.tsx";
 import { useApi } from "../utils/api";
+import MapControls from "../components/MapControls";
 
 const Dashboard: React.FC = () => {
   const { fires, evacRoute, setEvacRoute, loading } = useLocalData() as any;
@@ -23,12 +22,17 @@ const Dashboard: React.FC = () => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [routeSafetyScore, setRouteSafetyScore] = useState<number | undefined>(undefined);
 
+  // Refs to Map's internal functions
+  const cycleBroadcastsFn = useRef<() => void>(() => {});
+  const cycleFiresFn = useRef<() => void>(() => {});
+  const cycleSensorsFn = useRef<() => void>(() => {});
+  const goToLocationFn = useRef<() => void>(() => {});
+
   const mapBackendToSensor = (backend: any): Sensor => {
     const ageSec = Date.now() / 1000 - backend.last_seen;
     let status: Sensor["status"] = "OFFLINE";
     if (ageSec < 60) status = "ONLINE";
     else if (ageSec < 300) status = "WARNING";
-
     return {
       id: backend.id,
       name: backend.id,
@@ -64,10 +68,7 @@ const Dashboard: React.FC = () => {
     };
     fetchSensors();
     const interval = setInterval(fetchSensors, 10000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    return () => { isMounted = false; clearInterval(interval); };
   }, [fetchWithAuth]);
 
   useEffect(() => {
@@ -91,10 +92,7 @@ const Dashboard: React.FC = () => {
     };
     fetchBroadcasts();
     const interval = setInterval(fetchBroadcasts, 10000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    return () => { isMounted = false; clearInterval(interval); };
   }, [fetchWithAuth]);
 
   const handleBroadcastDraftChange = (draft: BroadcastMessage) =>
@@ -167,10 +165,7 @@ const Dashboard: React.FC = () => {
       const result = await fetchWithAuth("/api/routing/evacuation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          origin: userLocation,
-          destination: destinationPin,
-        }),
+        body: JSON.stringify({ origin: userLocation, destination: destinationPin }),
       });
       setEvacRoute(result.route);
       setHasRoute(true);
@@ -211,57 +206,27 @@ const Dashboard: React.FC = () => {
           hasActiveRoute={hasRoute}
           isSelectingDestination={isSelectingDestination}
           destinationPin={destinationPin}
+          onCycleBroadcastsRef={(fn) => (cycleBroadcastsFn.current = fn)}
+          onCycleFiresRef={(fn) => (cycleFiresFn.current = fn)}
+          onCycleSensorsRef={(fn) => (cycleSensorsFn.current = fn)}
+          onGoToLocationRef={(fn) => (goToLocationFn.current = fn)}
         />
 
-        {/* Live Status overlay — top-left */}
-        <div className="pointer-events-none absolute top-4 left-4 z-50 w-72">
-          <div className="pointer-events-auto bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl p-4 border border-gray-200 max-h-80 overflow-y-auto">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">
-              🔥 Live Status
-            </h3>
-            {loading && (
-              <p className="text-gray-500 text-xs">Loading fire reports...</p>
-            )}
-            {!loading && fires.length === 0 && (
-              <p className="text-gray-500 text-xs">No active fire reports.</p>
-            )}
-            {!loading && fires.length > 0 && (
-              <div className="space-y-3">
-                {fires.map((fire: any) => (
-                  <FireReportCard
-                    key={fire.report_id}
-                    report_id={fire.report_id}
-                    photo_link={fire.photo_link}
-                    hazard_type={fire.hazard_type}
-                    uploading_user={fire.uploading_user}
-                    coordinates={fire.coordinates}
-                    severity={fire.severity}
-                    timestamp={fire.timestamp}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* BroadcastForm overlay — bottom-left */}
-        <div className="pointer-events-none absolute bottom-6 left-4 z-50 w-80">
-          <div className="pointer-events-auto bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl p-4 border border-gray-200">
-            <h3 className="text-lg font-semibold text-red-700 mb-3 text-center">
-              Broadcast Alert
-            </h3>
-            {isPlacingAlert && (
-              <div className="mb-3 p-2 bg-blue-100 text-blue-800 rounded-lg text-xs font-semibold">
-                Click on the map to place alert location
-              </div>
-            )}
-            <BroadcastForm
-              onSubmit={handleBroadcast}
-              onChange={handleBroadcastDraftChange}
-              loading={broadcastLoading}
-            />
-          </div>
-        </div>
+        {/* 3 icon buttons + draggable windows */}
+        <MapControls
+          fires={fires}
+          loading={loading}
+          isPlacingAlert={isPlacingAlert}
+          broadcastCount={broadcastAlerts.length}
+          sensorCount={sensors.length}
+          onBroadcastSubmit={handleBroadcast}
+          onBroadcastChange={handleBroadcastDraftChange}
+          broadcastLoading={broadcastLoading}
+          onCycleBroadcasts={() => cycleBroadcastsFn.current()}
+          onCycleFires={() => cycleFiresFn.current()}
+          onCycleSensors={() => cycleSensorsFn.current()}
+          onGoToLocation={() => goToLocationFn.current()}
+        />
 
       </div>
     </div>
