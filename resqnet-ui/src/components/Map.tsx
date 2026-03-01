@@ -13,6 +13,7 @@ import type { Feature, FeatureCollection, LineString, Polygon } from 'geojson';
 import sensorGif from '../assets/sensor.gif';
 import reportGif from '../assets/report.gif';
 import alertGif from '../assets/alert.gif';
+import { Navigation } from 'lucide-react';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -30,6 +31,7 @@ export interface BroadcastAlert {
   radius: number;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   message: string;
+  timestamp?: string;
 }
 
 export interface Sensor {
@@ -62,11 +64,11 @@ interface MapProps {
   hasActiveRoute?: boolean;
   isSelectingDestination?: boolean;
   destinationPin?: [number, number] | null;
-  // Ref callbacks so Dashboard can wire cycle/location fns to MapControls
   onCycleBroadcastsRef?: (fn: () => void) => void;
   onCycleFiresRef?: (fn: () => void) => void;
   onCycleSensorsRef?: (fn: () => void) => void;
   onGoToLocationRef?: (fn: () => void) => void;
+  onFlyToRef?: (fn: (lat: number, lng: number) => void) => void;
 }
 
 interface PopupInfo {
@@ -97,6 +99,7 @@ const MapComponent: React.FC<MapProps> = ({
   onCycleFiresRef,
   onCycleSensorsRef,
   onGoToLocationRef,
+  onFlyToRef,
 }) => {
   const mapRef = useRef<MapRef | null>(null);
 
@@ -110,11 +113,9 @@ const MapComponent: React.FC<MapProps> = ({
   const [initialUserLocation, setInitialUserLocation] = useState<[number, number] | null>(null);
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
   const [mousePosition, setMousePosition] = useState<[number, number] | null>(null);
-
   const [broadcastIndex, setBroadcastIndex] = useState(0);
   const [fireIndex, setFireIndex] = useState(0);
   const [sensorIndex, setSensorIndex] = useState(0);
-
   const [searchInput, setSearchInput] = useState('');
 
   useEffect(() => {
@@ -242,12 +243,12 @@ const MapComponent: React.FC<MapProps> = ({
     flyTo(lng, lat, 12);
   };
 
-  // Expose functions to Dashboard via ref callbacks
   useEffect(() => {
     onCycleBroadcastsRef?.(cycleBroadcasts);
     onCycleFiresRef?.(cycleFires);
     onCycleSensorsRef?.(cycleSensors);
     onGoToLocationRef?.(goToUserLocation);
+    onFlyToRef?.((lat: number, lng: number) => flyTo(lng, lat));
   }, [broadcastAlerts, fires, sensors, userLocation]);
 
   return (
@@ -320,8 +321,7 @@ const MapComponent: React.FC<MapProps> = ({
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                 strokeWidth={1.5} stroke="currentColor"
                 className="w-5 h-5 text-blue-600"
-                style={{ transform: 'rotate(-90deg)' }}
-              >
+                style={{ transform: 'rotate(-90deg)' }}>
                 <path strokeLinecap="round" strokeLinejoin="round"
                   d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
               </svg>
@@ -329,7 +329,7 @@ const MapComponent: React.FC<MapProps> = ({
           </Marker>
         )}
 
-        {/* Destination pin marker */}
+        {/* Destination pin */}
         {destinationPin && (
           <Marker longitude={destinationPin[1]} latitude={destinationPin[0]}>
             <div
@@ -387,7 +387,7 @@ const MapComponent: React.FC<MapProps> = ({
           </Marker>
         ))}
 
-        {/* Broadcast alert markers */}
+        {/* Broadcast markers */}
         {broadcastAlerts.map((alert) => {
           const radiusKm = alert.radius && alert.radius > 0 ? alert.radius : 1;
           return (
@@ -405,7 +405,7 @@ const MapComponent: React.FC<MapProps> = ({
           );
         })}
 
-        {/* Broadcast alert circles */}
+        {/* Alert circles */}
         {alertCirclePolygons.length > 0 && (
           <Source id="alert-circles" type="geojson" data={alertsCollection}>
             <Layer id="alert-circles-fill" type="fill"
@@ -415,7 +415,7 @@ const MapComponent: React.FC<MapProps> = ({
           </Source>
         )}
 
-        {/* Draft alert preview circle */}
+        {/* Draft alert circle */}
         {draftAlertCollection && (
           <Source id="draft-alert-circle" type="geojson" data={draftAlertCollection}>
             <Layer id="draft-alert-circle-fill" type="fill"
@@ -485,7 +485,7 @@ const MapComponent: React.FC<MapProps> = ({
         )}
       </Map>
 
-      {/* Draft alert radius indicator */}
+      {/* Draft alert indicator */}
       {mousePosition && (
         <div className="pointer-events-none fixed top-4 left-1/2 -translate-x-1/2 rounded bg-black/80 px-3 py-2 text-sm text-white shadow-lg z-50">
           Radius: {draftRadiusKm.toFixed(2)} km | Priority: {draftPriority}
@@ -546,6 +546,16 @@ const MapComponent: React.FC<MapProps> = ({
           </button>
         )}
       </div>
+
+      {/* My Location — always visible bottom-right */}
+<button
+  type="button"
+  onClick={goToUserLocation}
+  title="Go to my location"
+  className="absolute bottom-4 right-4 z-50 w-10 h-10 rounded-full bg-white/95 backdrop-blur shadow-md border border-gray-200 flex items-center justify-center text-blue-600 hover:bg-blue-50 transition-colors"
+>
+  <Navigation size={18} />
+</button>
     </div>
   );
 };

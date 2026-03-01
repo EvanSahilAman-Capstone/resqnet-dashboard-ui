@@ -1,17 +1,19 @@
-import React, { useState } from "react";
-import { Flame, Radio, Map } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Flame, Radio, Map, List, Plus, ChevronRight } from "lucide-react";
 import DraggableWindow from "./DraggableWindow";
-import IncidentsPanel from "./IncidentsPanel";
 import LegendPanel from "./LegendPanel";
+import BroadcastAlertsPanel from "./BroadcastAlertsPanel";
 import BroadcastForm from "./BroadcastForm";
+import type { BroadcastAlert } from "./Map";
 import type { FireReport } from "../hooks/useLocalData";
 import type { BroadcastMessage } from "./BroadcastForm";
+import { usePanels } from "../context/PanelContext";
 
 interface MapControlsProps {
   fires: FireReport[];
   loading: boolean;
   isPlacingAlert: boolean;
-  broadcastCount: number;
+  broadcastAlerts: BroadcastAlert[];
   sensorCount: number;
   onBroadcastSubmit: (data: BroadcastMessage) => void;
   onBroadcastChange: (data: BroadcastMessage) => void;
@@ -20,107 +22,129 @@ interface MapControlsProps {
   onCycleFires: () => void;
   onCycleSensors: () => void;
   onGoToLocation: () => void;
+  onFlyTo: (lat: number, lng: number) => void;
 }
 
-type Panel = "incidents" | "broadcast" | "legend";
-
 const MapControls: React.FC<MapControlsProps> = ({
-  fires,
-  loading,
-  isPlacingAlert,
-  broadcastCount,
-  sensorCount,
-  onBroadcastSubmit,
-  onBroadcastChange,
-  broadcastLoading,
-  onCycleBroadcasts,
-  onCycleFires,
-  onCycleSensors,
-  onGoToLocation,
+  fires, loading, isPlacingAlert,
+  broadcastAlerts, sensorCount,
+  onBroadcastSubmit, onBroadcastChange, broadcastLoading,
+  onCycleBroadcasts, onCycleFires, onCycleSensors, onGoToLocation,
+  onFlyTo,
 }) => {
-  const [openPanels, setOpenPanels] = useState<Set<Panel>>(new Set());
+  const {
+    openPanels, togglePanel, closePanel,
+    broadcastSub, setBroadcastSub,
+    setIncidentsOpen, incidentsOpen,
+    getWindowState,
+  } = usePanels();
 
-  const toggle = (panel: Panel) => {
-    setOpenPanels((prev) => {
-      const next = new Set(prev);
-      if (next.has(panel)) {
-        next.delete(panel);
-      } else {
-        next.add(panel);
-      }
-      return next;
-    });
+  const [showBroadcastMenu, setShowBroadcastMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node))
+        setShowBroadcastMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const openBroadcastSub = (sub: "list" | "create") => {
+    setBroadcastSub(sub);
+    if (!openPanels.has("broadcast")) togglePanel("broadcast");
+    setShowBroadcastMenu(false);
   };
-
-  const close = (panel: Panel) => {
-    setOpenPanels((prev) => {
-      const next = new Set(prev);
-      next.delete(panel);
-      return next;
-    });
-  };
-
-  const buttons = [
-    {
-      id: "incidents" as Panel,
-      icon: <Flame size={18} />,
-      label: "Incidents",
-      activeClass: "bg-red-100 text-red-700",
-      inactiveClass: "text-gray-600 hover:bg-red-50 hover:text-red-600",
-    },
-    {
-      id: "broadcast" as Panel,
-      icon: <Radio size={18} />,
-      label: "Broadcast",
-      activeClass: "bg-orange-100 text-orange-700",
-      inactiveClass: "text-gray-600 hover:bg-orange-50 hover:text-orange-600",
-    },
-    {
-      id: "legend" as Panel,
-      icon: <Map size={18} />,
-      label: "Legend",
-      activeClass: "bg-blue-100 text-blue-700",
-      inactiveClass: "text-gray-600 hover:bg-blue-50 hover:text-blue-600",
-    },
-  ];
 
   return (
     <>
       {/* Top-right icon buttons */}
       <div className="absolute top-4 right-4 z-50 flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 px-2 py-1.5">
-        {buttons.map((btn) => (
+
+        {/* Incidents */}
+        <button
+          type="button"
+          onClick={() => setIncidentsOpen(!incidentsOpen)}
+          title="Incidents"
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all text-xs font-medium
+            ${incidentsOpen ? "bg-red-100 text-red-700" : "text-gray-600 hover:bg-red-50 hover:text-red-600"}`}
+        >
+          <Flame size={18} />
+          <span className="text-[10px]">Incidents</span>
+        </button>
+
+        {/* Broadcast with submenu */}
+        <div className="relative" ref={menuRef}>
           <button
-            key={btn.id}
             type="button"
-            onClick={() => toggle(btn.id)}
-            title={btn.label}
+            onClick={() => setShowBroadcastMenu((p) => !p)}
+            title="Broadcast"
             className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all text-xs font-medium
-              ${openPanels.has(btn.id) ? btn.activeClass : btn.inactiveClass}`}
+              ${openPanels.has("broadcast") ? "bg-orange-100 text-orange-700" : "text-gray-600 hover:bg-orange-50 hover:text-orange-600"}`}
           >
-            {btn.icon}
-            <span className="text-[10px]">{btn.label}</span>
+            <Radio size={18} />
+            <span className="text-[10px]">Broadcast</span>
           </button>
-        ))}
+
+          {showBroadcastMenu && (
+            <div className="absolute top-full right-0 mt-2 w-48 bg-white/98 backdrop-blur-sm rounded-xl shadow-xl border border-gray-200 overflow-hidden z-[1000]">
+              <button
+                type="button"
+                onClick={() => openBroadcastSub("list")}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors"
+              >
+                <List size={15} />
+                <span>Broadcast Alerts</span>
+                <ChevronRight size={13} className="ml-auto text-gray-400" />
+              </button>
+              <div className="border-t border-gray-100" />
+              <button
+                type="button"
+                onClick={() => openBroadcastSub("create")}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors"
+              >
+                <Plus size={15} />
+                <span>Create Broadcast</span>
+                <ChevronRight size={13} className="ml-auto text-gray-400" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Legend */}
+        <button
+          type="button"
+          onClick={() => togglePanel("legend")}
+          title="Legend"
+          className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all text-xs font-medium
+            ${openPanels.has("legend") ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"}`}
+        >
+          <Map size={18} />
+          <span className="text-[10px]">Legend</span>
+        </button>
       </div>
 
-      {/* Incidents Window */}
-      {openPanels.has("incidents") && (
+      {/* Broadcast Alerts List */}
+      {openPanels.has("broadcast") && broadcastSub === "list" && (
         <DraggableWindow
-          title={`Incidents (${fires.length})`}
-          onClose={() => close("incidents")}
-          initialPosition={{ x: 80, y: 70 }}
-          width="w-96"
+          id="broadcast_list"
+          title="Broadcast Alerts"
+          onClose={() => closePanel("broadcast")}
+          defaultPosition={{ x: 500, y: 70 }}
+          width="w-80"
         >
-          <IncidentsPanel fires={fires} loading={loading} />
+          <BroadcastAlertsPanel alerts={broadcastAlerts} onFlyTo={onFlyTo} />
         </DraggableWindow>
       )}
 
-      {/* Broadcast Window */}
-      {openPanels.has("broadcast") && (
+      {/* Create Broadcast */}
+      {openPanels.has("broadcast") && broadcastSub === "create" && (
         <DraggableWindow
-          title="Broadcast Alert"
-          onClose={() => close("broadcast")}
-          initialPosition={{ x: 500, y: 70 }}
+          id="broadcast_create"
+          title="Create Broadcast"
+          onClose={() => closePanel("broadcast")}
+          defaultPosition={{ x: 500, y: 70 }}
           width="w-80"
         >
           <div className="p-4">
@@ -138,16 +162,17 @@ const MapControls: React.FC<MapControlsProps> = ({
         </DraggableWindow>
       )}
 
-      {/* Legend Window */}
+      {/* Legend */}
       {openPanels.has("legend") && (
         <DraggableWindow
+          id="legend"
           title="Legend"
-          onClose={() => close("legend")}
-          initialPosition={{ x: 900, y: 70 }}
+          onClose={() => closePanel("legend")}
+          defaultPosition={{ x: 900, y: 70 }}
           width="w-64"
         >
           <LegendPanel
-            broadcastCount={broadcastCount}
+            broadcastCount={broadcastAlerts.length}
             fireCount={fires.length}
             sensorCount={sensorCount}
             onCycleBroadcasts={onCycleBroadcasts}
