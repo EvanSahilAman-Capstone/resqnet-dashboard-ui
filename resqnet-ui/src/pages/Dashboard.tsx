@@ -5,10 +5,13 @@ import { useLocalData } from "../hooks/useLocalData.ts";
 import type { BroadcastMessage } from "../components/BroadcastForm.tsx";
 import { useApi } from "../utils/api";
 import MapControls from "../components/MapControls";
+import IncidentsPanel from "../components/IncidentsPanel";
+import { usePanels } from "../context/PanelContext";
 
 const Dashboard: React.FC = () => {
   const { fires, evacRoute, setEvacRoute, loading } = useLocalData() as any;
   const { fetchWithAuth } = useApi();
+  const { incidentsOpen } = usePanels();
 
   const [broadcastAlerts, setBroadcastAlerts] = useState<BroadcastAlert[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
@@ -22,11 +25,11 @@ const Dashboard: React.FC = () => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [routeSafetyScore, setRouteSafetyScore] = useState<number | undefined>(undefined);
 
-  // Refs to Map's internal functions
   const cycleBroadcastsFn = useRef<() => void>(() => {});
   const cycleFiresFn = useRef<() => void>(() => {});
   const cycleSensorsFn = useRef<() => void>(() => {});
   const goToLocationFn = useRef<() => void>(() => {});
+  const flyToFn = useRef<(lat: number, lng: number) => void>(() => {});
 
   const mapBackendToSensor = (backend: any): Sensor => {
     const ageSec = Date.now() / 1000 - backend.last_seen;
@@ -82,8 +85,9 @@ const Dashboard: React.FC = () => {
           id: b._id || b.id || `broadcast-${idx}`,
           position: b.coordinates || [44.5, -79.5],
           radius: b.radius || 1,
-          priority: (b.priority || "low").toUpperCase(),
+          priority: (b.priority || "low").toUpperCase() as BroadcastAlert["priority"],
           message: b.message,
+          timestamp: b.timestamp || null,
         }));
         setBroadcastAlerts(alerts);
       } catch (err) {
@@ -122,10 +126,11 @@ const Dashboard: React.FC = () => {
         ...prev,
         {
           id: result.broadcast_id,
-          position: [lat, lng],
+          position: [lat, lng] as [number, number],
           radius: pendingBroadcast.radius,
           priority: pendingBroadcast.priority,
           message: pendingBroadcast.message,
+          timestamp: new Date().toISOString(),
         },
       ]);
     } catch (err) {
@@ -188,6 +193,13 @@ const Dashboard: React.FC = () => {
     <div className="h-screen w-full">
       <div className="relative h-full w-full">
 
+        {/* Incidents panel — fixed overlay on top of map */}
+        <IncidentsPanel
+          fires={fires}
+          loading={loading}
+          onFlyTo={(lat, lng) => flyToFn.current(lat, lng)}
+        />
+
         {/* Full-area Map */}
         <Map
           fires={wildfireEvents}
@@ -210,14 +222,15 @@ const Dashboard: React.FC = () => {
           onCycleFiresRef={(fn) => (cycleFiresFn.current = fn)}
           onCycleSensorsRef={(fn) => (cycleSensorsFn.current = fn)}
           onGoToLocationRef={(fn) => (goToLocationFn.current = fn)}
+          onFlyToRef={(fn: (lat: number, lng: number) => void) => (flyToFn.current = fn)}
         />
 
-        {/* 3 icon buttons + draggable windows */}
+        {/* Map controls + floating windows */}
         <MapControls
           fires={fires}
           loading={loading}
           isPlacingAlert={isPlacingAlert}
-          broadcastCount={broadcastAlerts.length}
+          broadcastAlerts={broadcastAlerts}
           sensorCount={sensors.length}
           onBroadcastSubmit={handleBroadcast}
           onBroadcastChange={handleBroadcastDraftChange}
@@ -226,6 +239,7 @@ const Dashboard: React.FC = () => {
           onCycleFires={() => cycleFiresFn.current()}
           onCycleSensors={() => cycleSensorsFn.current()}
           onGoToLocation={() => goToLocationFn.current()}
+          onFlyTo={(lat, lng) => flyToFn.current(lat, lng)}
         />
 
       </div>

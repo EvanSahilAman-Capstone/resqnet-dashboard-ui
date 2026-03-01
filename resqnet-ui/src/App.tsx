@@ -6,6 +6,7 @@ import Alerts from './pages/Alerts'
 import Sensors from './pages/Sensors'
 import { Login } from './pages/Login'
 import Layout from './components/Layout'
+import { PanelProvider } from './context/PanelContext'
 
 function App() {
   const { isLoading, isAuthenticated } = useAuth0();
@@ -19,36 +20,32 @@ function App() {
   }
 
   return (
-    <Router>
-      <Routes>
-        {/* Public: Login */}
-        <Route
-          path="/login"
-          element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" replace />}
-        />
 
-        {/* Protected: Layout wraps all app pages */}
-        <Route
-          path="/"
-          element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}
-        >
+    <PanelProvider>
+      <Router>
+        <Routes>
+          {/* Public: Login */}
+          <Route
+            path="/login"
+            element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" replace />}
+          />
 
-          <Route index element={<Navigate to="/dashboard" replace />} />
-
-
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="alerts" element={<Alerts />} />
-          <Route path="sensors" element={<Sensors />} />
-
-
+          {/* Protected: Layout wraps all app pages */}
+          <Route
+            path="/"
+            element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}
+          >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="alerts" element={<Alerts />} />
+            <Route path="sensors" element={<Sensors />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-
-        {/* Anything outside / → /dashboard (ProtectedRoute handles auth gate) */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </PanelProvider>
   )
 }
 
