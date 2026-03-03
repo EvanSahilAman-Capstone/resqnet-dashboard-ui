@@ -51,7 +51,7 @@ const Sensors: React.FC = () => {
       longitude: Number(backend.lng) || 0,
       health: 100, // Backend doesn't provide
       temperature: Number(backend.temperature) || 0,
-      humidity: Number(backend.smoke_level) || 0, // ← Map smoke_level to humidity
+      humidity: Number(backend.smoke_level) || 0, // Map smoke_level to humidity
       battery: Number(backend.battery_level) || 100,
       lastPing: new Date((backend.last_seen || 0) * 1000).toISOString(),
       containerId: backend.container_id,
@@ -170,9 +170,80 @@ const Sensors: React.FC = () => {
 
       <div className="lg:w-2/3 w-full p-6">
         {selectedSensor ? (
-          /* right-panel details unchanged */
-          <div className="bg-white shadow-xl rounded-xl p-8 h-full flex flex-col">
-            {/* ... keep your existing right-hand UI ... */}
+          <div className="bg-white shadow-xl rounded-xl p-8 flex flex-col">
+            <div className="space-y-8 h-full flex flex-col">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between pb-6 border-b border-gray-200">
+                <div>
+                  <span className="text-2xl font-bold text-gray-900 pr-2">
+                    {selectedSensor.name}
+                  </span>
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(selectedSensor.status)}`}
+                  >
+                    {selectedSensor.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Metrics Table */}
+              <div className="flex-1">
+                <h4 className="text-lg font-semibold text-gray-900 mb-6">
+                  Live Readings
+                </h4>
+                <div className="grid grid-cols-4 gap-2 text-sm">
+                  <div>
+                    <div className="text-3xl font-bold text-gray-900 mb-1">
+                      {selectedSensor.temperature}°C
+                    </div>
+                    <div className="text-gray-500 uppercase tracking-wide text-xs">
+                      Temperature
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold text-gray-900 mb-1">
+                      {selectedSensor.humidity}%
+                    </div>
+                    <div className="text-gray-500 uppercase tracking-wide text-xs">
+                      Humidity
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold text-gray-900 mb-1">
+                      {selectedSensor.health}%
+                    </div>
+                    <div className="text-gray-500 uppercase tracking-wide text-xs">
+                      Health
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold text-gray-900 mb-1">
+                      {selectedSensor.battery}%
+                    </div>
+                    <div className="text-gray-500 uppercase tracking-wide text-xs">
+                      Battery
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Location & Last Ping */}
+              <div className="pt-6 border-t border-gray-200">
+                <div className="flex justify-between items-start mb-3">
+                  <span className="font-semibold text-gray-900 text-lg">
+                    Location
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(selectedSensor.lastPing).toLocaleString()}
+                  </span>
+                </div>
+                <div className="text-xl font-bold text-gray-900">
+                  {selectedSensor.latitude.toFixed(4)},{" "}
+                  {selectedSensor.longitude.toFixed(4)}
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="bg-white shadow-lg rounded-xl p-12 text-center h-full flex flex-col justify-center">
