@@ -1,4 +1,5 @@
-import React, { useState } from 'react'; 
+import React, { useState } from 'react';
+import { Circle, Square, PenLine, AlertTriangle, ChevronUp, ChevronDown, Radio, RotateCcw } from 'lucide-react';
 
 export interface BroadcastMessage {
   message: string;
@@ -6,109 +7,240 @@ export interface BroadcastMessage {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 }
 
+export type DrawMode = 'circle' | 'square' | 'freehand';
+
 interface BroadcastFormProps {
   onSubmit: (data: BroadcastMessage) => void;
-  onChange?: (data: BroadcastMessage) => void; // NEW
+  onChange?: (data: BroadcastMessage) => void;
+  onDrawModeChange?: (mode: DrawMode) => void;
+  onActivate?: () => void;
+  onCancel?: () => void;
   loading?: boolean;
+  liveRadiusKm?: number;
+  onRadiusChange?: (r: number) => void;
+  isPlacingAlert?: boolean;
 }
 
-const BroadcastForm: React.FC<BroadcastFormProps> = ({ onSubmit, onChange, loading = false }) => {
-  const [broadcast, setBroadcast] = useState<BroadcastMessage>({
-    message: '',
-    radius: 5,
-    priority: 'MEDIUM'
-  });
+const PRIORITY_COLORS: Record<BroadcastMessage['priority'], string> = {
+  LOW:    'bg-gray-300 text-gray-800',
+  MEDIUM: 'bg-yellow-400 text-yellow-900',
+  HIGH:   'bg-orange-500 text-white',
+  URGENT: 'bg-red-600 text-white',
+};
+
+const PRIORITY_ACTIVE: Record<BroadcastMessage['priority'], string> = {
+  LOW:    'ring-2 ring-offset-1 ring-gray-500',
+  MEDIUM: 'ring-2 ring-offset-1 ring-yellow-500',
+  HIGH:   'ring-2 ring-offset-1 ring-orange-500',
+  URGENT: 'ring-2 ring-offset-1 ring-red-600',
+};
+
+const DEFAULT_FORM: BroadcastMessage = { message: '', radius: 1, priority: 'MEDIUM' };
+
+const BroadcastForm: React.FC<BroadcastFormProps> = ({
+  onSubmit,
+  onChange,
+  onDrawModeChange,
+  onActivate,
+  onCancel,
+  loading = false,
+  liveRadiusKm,
+  onRadiusChange,
+  isPlacingAlert = false,
+}) => {
+  const [broadcast, setBroadcast] = useState<BroadcastMessage>(DEFAULT_FORM);
+  const [drawMode, setDrawMode]   = useState<DrawMode>('circle');
+  const [messageError, setMessageError] = useState(false);
+
+  const displayRadius = liveRadiusKm ?? broadcast.radius;
 
   const updateBroadcast = (next: BroadcastMessage) => {
     setBroadcast(next);
-    onChange?.(next);            // notify Dashboard on every change
+    onChange?.(next);
+    if (next.message.trim()) setMessageError(false);
   };
 
-  const handleBroadcastChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
-    const { name, value } = e.target;
-    updateBroadcast({
-      ...broadcast,
-      [name]: name === 'radius' ? Number(value) : value,
-    } as BroadcastMessage);
+  const handleReset = () => {
+    setBroadcast(DEFAULT_FORM);
+    onChange?.(DEFAULT_FORM);
+    onRadiusChange?.(DEFAULT_FORM.radius);
+    setMessageError(false);
   };
 
-  const handlePriorityChange = (priority: BroadcastMessage['priority']) => {
+  const handlePriority = (priority: BroadcastMessage['priority']) =>
     updateBroadcast({ ...broadcast, priority });
+
+  const handleRadiusInput = (val: number) => {
+    const clamped = Math.max(0.1, Math.round(val * 10) / 10);
+    updateBroadcast({ ...broadcast, radius: clamped });
+    onRadiusChange?.(clamped);
   };
 
-  const handleRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    updateBroadcast({ ...broadcast, radius: Number(e.target.value) });
+  const handleDrawMode = (mode: DrawMode) => {
+    setDrawMode(mode);
+    onDrawModeChange?.(mode);
+  };
+
+  const handleActivate = () => {
+    if (!broadcast.message.trim()) {
+      setMessageError(true);
+      return;
+    }
+    setMessageError(false);
+    onActivate?.();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(broadcast);
+    if (!broadcast.message.trim()) {
+      setMessageError(true);
+      return;
+    }
+    onSubmit({ ...broadcast, radius: displayRadius });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {/* message, radius, priority, button – unchanged except handlers */}
+    <form onSubmit={handleSubmit} className="space-y-3">
+
+      {/* ── Draw mode ── */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Mode</span>
+        {([
+          { mode: 'circle'   as DrawMode, Icon: Circle,  label: 'Circle'    },
+          { mode: 'square'   as DrawMode, Icon: Square,  label: 'Rectangle' },
+          { mode: 'freehand' as DrawMode, Icon: PenLine, label: 'Freehand'  },
+        ] as const).map(({ mode, Icon, label }) => (
+          <button
+            key={mode}
+            type="button"
+            title={label}
+            onClick={() => handleDrawMode(mode)}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all
+              ${drawMode === mode
+                ? 'bg-gray-900 text-white border-gray-900'
+                : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-100'
+              }`}
+          >
+            <Icon size={14} />
+          </button>
+        ))}
+      </div>
+
+      {/* ── Message ── */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Alert Message</label>
         <textarea
           name="message"
           value={broadcast.message}
-          onChange={handleBroadcastChange}
+          onChange={(e) => updateBroadcast({ ...broadcast, message: e.target.value })}
           rows={2}
-          placeholder="Enter message to be broadcast"
-          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 placeholder-gray-500"
-          required
+          placeholder="Alert message..."
+          className={`w-full p-2 text-sm border rounded-lg focus:outline-none focus:ring-2 placeholder-gray-400 resize-none transition-colors
+            ${messageError
+              ? 'border-red-400 focus:ring-red-300 bg-red-50'
+              : 'border-gray-200 focus:ring-gray-300'
+            }`}
         />
+        {messageError && (
+          <p className="text-xs text-red-500 mt-1">Message required before placing.</p>
+        )}
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Radius</label>
-        <div className="flex items-center space-x-4">
+      {/* ── Radius ── */}
+      <div className="flex items-center gap-2">
+        <input
+          type="range"
+          min="0.1"
+          max="50"
+          step="0.1"
+          value={displayRadius}
+          onChange={(e) => handleRadiusInput(Number(e.target.value))}
+          className="flex-1 h-1.5 accent-gray-900"
+        />
+        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden shrink-0">
+          <button
+            type="button"
+            onClick={() => handleRadiusInput(displayRadius - 0.1)}
+            className="px-1.5 py-1 text-gray-500 hover:bg-gray-100 transition-colors"
+          >
+            <ChevronDown size={13} />
+          </button>
           <input
-            type="range"
-            name="radius"
-            min="1"
+            type="number"
+            min="0.1"
             max="50"
-            value={broadcast.radius}
-            onChange={handleRadiusChange}
-            className="flex-1 h-4 bg-gray-200 rounded-lg accent-purple-900"
+            step="0.1"
+            value={displayRadius.toFixed(1)}
+            onChange={(e) => handleRadiusInput(Number(e.target.value))}
+            className="w-12 text-center text-xs font-mono border-none outline-none py-1"
           />
-          <span className="font-mono text-lg">{broadcast.radius} km</span>
+          <button
+            type="button"
+            onClick={() => handleRadiusInput(displayRadius + 0.1)}
+            className="px-1.5 py-1 text-gray-500 hover:bg-gray-100 transition-colors"
+          >
+            <ChevronUp size={13} />
+          </button>
         </div>
+        <span className="text-[11px] text-gray-400 font-mono shrink-0">km</span>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">Priority</label>
-        <div className="flex space-x-2 items-center">
-          {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const).map((priority) => (
+      {/* ── Priority dots ── */}
+      <div className="flex items-center gap-2">
+        <AlertTriangle size={13} className="text-gray-400 shrink-0" />
+        <div className="flex gap-2">
+          {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const).map((p) => (
             <button
-              key={priority}
+              key={p}
               type="button"
-              onClick={() => handlePriorityChange(priority)}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                broadcast.priority === priority
-                  ? 'shadow-lg'
-                  : 'bg-gray-200 hover:bg-gray-300'
-              } ${priority === 'URGENT' ? 'bg-red-100 text-red-800' : 
-                 priority === 'HIGH' ? 'bg-orange-100 text-orange-800' : 
-                 priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' : 
-                 'bg-gray-200 text-gray-800'}`}
-            >
-              {priority}
-            </button>
+              title={p}
+              onClick={() => handlePriority(p)}
+              className={`w-6 h-6 rounded-full transition-all ${PRIORITY_COLORS[p]}
+                ${broadcast.priority === p
+                  ? PRIORITY_ACTIVE[p] + ' scale-110'
+                  : 'opacity-50 hover:opacity-80'
+                }`}
+            />
           ))}
         </div>
+        <span className="text-[11px] text-gray-400 ml-auto">{broadcast.priority}</span>
       </div>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className={`w-full bg-red-600 text-white py-3 px-6 rounded-lg font-bold text-lg shadow-lg hover:bg-red-700 transition-all ${
-          loading ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
-      >
-        {loading ? '🚨 SENDING...' : `BROADCAST (${broadcast.priority})`}
-      </button>
+      {/* ── Actions ── */}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={handleReset}
+          title="Reset form"
+          className="w-9 h-9 rounded-lg border border-gray-200 text-gray-400 flex items-center justify-center hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"
+        >
+          <RotateCcw size={14} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (isPlacingAlert) {
+              onCancel?.();
+            } else {
+              handleActivate();
+            }
+          }}
+          disabled={loading}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-all
+            ${loading
+              ? 'opacity-50 cursor-not-allowed bg-gray-900 text-white'
+              : isPlacingAlert
+                ? 'bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-300'
+                : 'bg-gray-900 text-white hover:bg-gray-700'
+            }`}
+        >
+          <Radio size={15} className={isPlacingAlert ? 'animate-pulse' : ''} />
+          <span>
+            {loading ? 'Sending...' : isPlacingAlert ? 'Placing...' : 'Place on Map'}
+          </span>
+        </button>
+      </div>
+
     </form>
   );
 };
