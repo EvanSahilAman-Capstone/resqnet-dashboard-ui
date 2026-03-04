@@ -10,7 +10,7 @@ import MapPopup from './MapPopup';
 import MapStylePicker from './MapStylePicker';
 import MapRoutingBar from './MapRoutingBar';
 import MapOverlays from './MapOverlays';
-import { MAP_STYLES, getConfidenceLabel } from './constants';
+import { MAP_STYLES } from './constants';
 import type { MapProps, PopupInfo } from './types';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -38,7 +38,6 @@ const MapCore: React.FC<MapProps> = ({
   onCycleSensorsRef,
   onGoToLocationRef,
   onFlyToRef,
-  onDraftRadiusChange,
 }) => {
   const mapRef     = useRef<MapRef | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);

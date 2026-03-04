@@ -1,5 +1,5 @@
 import React from "react";
-import type { BroadcastAlert } from "./Map";
+import type { BroadcastAlert } from "./map";
 import alertGif from "../assets/alert.gif";
 import { Clock, MapPin, Radio, ChevronDown } from "lucide-react";
 
