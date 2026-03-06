@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Map from "../components/map";
-import type { BroadcastAlert, Sensor } from "../components/map";
+import type { BroadcastAlert, Sensor } from "../components/map/index.tsx";
 import MapControls from "../components/MapControls";
 import { useLocalData } from "../hooks/useLocalData.ts";
 import type { BroadcastMessage } from "../components/BroadcastForm.tsx";
