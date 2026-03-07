@@ -2,23 +2,25 @@ import React, { useState } from 'react';
 import { Circle, Square, PenLine, AlertTriangle, ChevronUp, ChevronDown, Radio, RotateCcw } from 'lucide-react';
 
 export interface BroadcastMessage {
-  message: string;
-  radius: number;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  message:     string;
+  radius:      number;
+  priority:    'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  coordinates: [number, number];
 }
 
 export type DrawMode = 'circle' | 'square' | 'freehand';
 
 interface BroadcastFormProps {
-  onSubmit: (data: BroadcastMessage) => void;
-  onChange?: (data: BroadcastMessage) => void;
+  onSubmit:          (data: BroadcastMessage) => void;
+  onChange?:         (data: BroadcastMessage) => void;
   onDrawModeChange?: (mode: DrawMode) => void;
-  onActivate?: () => void;
-  onCancel?: () => void;
-  loading?: boolean;
-  liveRadiusKm?: number;
-  onRadiusChange?: (r: number) => void;
-  isPlacingAlert?: boolean;
+  onActivate?:       () => void;
+  onCancel?:         () => void;
+  loading?:          boolean;
+  liveRadiusKm?:     number;
+  onRadiusChange?:   (r: number) => void;
+  isPlacingAlert?:   boolean;
+  coordinates?:      [number, number];
 }
 
 const PRIORITY_COLORS: Record<BroadcastMessage['priority'], string> = {
@@ -35,7 +37,12 @@ const PRIORITY_ACTIVE: Record<BroadcastMessage['priority'], string> = {
   URGENT: 'ring-2 ring-offset-1 ring-red-600',
 };
 
-const DEFAULT_FORM: BroadcastMessage = { message: '', radius: 1, priority: 'MEDIUM' };
+const DEFAULT_FORM: BroadcastMessage = {
+  message:     '',
+  radius:      1,
+  priority:    'MEDIUM',
+  coordinates: [0, 0],
+};
 
 const BroadcastForm: React.FC<BroadcastFormProps> = ({
   onSubmit,
@@ -47,9 +54,10 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({
   liveRadiusKm,
   onRadiusChange,
   isPlacingAlert = false,
+  coordinates,
 }) => {
-  const [broadcast, setBroadcast] = useState<BroadcastMessage>(DEFAULT_FORM);
-  const [drawMode, setDrawMode]   = useState<DrawMode>('circle');
+  const [broadcast, setBroadcast]     = useState<BroadcastMessage>(DEFAULT_FORM);
+  const [drawMode, setDrawMode]       = useState<DrawMode>('circle');
   const [messageError, setMessageError] = useState(false);
 
   const displayRadius = liveRadiusKm ?? broadcast.radius;
@@ -82,21 +90,23 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({
   };
 
   const handleActivate = () => {
-    if (!broadcast.message.trim()) {
-      setMessageError(true);
-      return;
-    }
+    if (!broadcast.message.trim()) { setMessageError(true); return; }
     setMessageError(false);
     onActivate?.();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!broadcast.message.trim()) {
-      setMessageError(true);
-      return;
-    }
-    onSubmit({ ...broadcast, radius: displayRadius });
+    if (!broadcast.message.trim()) { setMessageError(true); return; }
+
+    const coords: [number, number] = coordinates ?? [0, 0];
+
+    onSubmit({
+      ...broadcast,
+      radius:      displayRadius,
+      coordinates: coords,
+      priority:    broadcast.priority.toLowerCase() as any,  // LOW → low for backend
+    });
   };
 
   return (
@@ -144,6 +154,22 @@ const BroadcastForm: React.FC<BroadcastFormProps> = ({
           <p className="text-xs text-red-500 mt-1">Message required before placing.</p>
         )}
       </div>
+
+      {/* ── Coordinates display (read-only) ── */}
+      {coordinates && (
+        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+            strokeWidth={1.5} stroke="currentColor" className="w-3 h-3 text-gray-400 shrink-0">
+            <path strokeLinecap="round" strokeLinejoin="round"
+              d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            <path strokeLinecap="round" strokeLinejoin="round"
+              d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+          </svg>
+          <span className="text-[11px] text-gray-500 font-mono">
+            {coordinates[0].toFixed(5)}, {coordinates[1].toFixed(5)}
+          </span>
+        </div>
+      )}
 
       {/* ── Radius ── */}
       <div className="flex items-center gap-2">

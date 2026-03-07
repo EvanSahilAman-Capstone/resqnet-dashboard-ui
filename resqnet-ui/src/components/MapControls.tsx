@@ -11,21 +11,22 @@ import type { BroadcastMessage } from "./BroadcastForm";
 import { usePanels } from "../context/PanelContext";
 
 interface MapControlsProps {
-  fires: FireReport[];
-  isPlacingAlert: boolean;
-  broadcastAlerts: BroadcastAlert[];
-  sensorCount: number;
-  onBroadcastSubmit: (data: BroadcastMessage) => void;
-  onBroadcastChange: (data: BroadcastMessage) => void;
-  onBroadcastCancel: () => void;
-  broadcastLoading: boolean;
-  onCycleBroadcasts: () => void;
-  onCycleFires: () => void;
-  onCycleSensors: () => void;
-  onGoToLocation: () => void;
-  onFlyTo: (lat: number, lng: number) => void;
-  liveRadiusKm?: number;
-  onRadiusChange?: (r: number) => void;
+  fires:               FireReport[];
+  isPlacingAlert:      boolean;
+  broadcastAlerts:     BroadcastAlert[];
+  sensorCount:         number;
+  onBroadcastSubmit:   (data: BroadcastMessage) => void;
+  onBroadcastChange:   (data: BroadcastMessage) => void;
+  onBroadcastCancel:   () => void;
+  broadcastLoading:    boolean;
+  onCycleBroadcasts:   () => void;
+  onCycleFires:        () => void;
+  onCycleSensors:      () => void;
+  onGoToLocation:      () => void;
+  onFlyTo:             (lat: number, lng: number) => void;
+  liveRadiusKm?:       number;
+  onRadiusChange?:     (r: number) => void;
+  alertCoordinates?:   [number, number];   // ← ADD THIS
 }
 
 const MapControls: React.FC<MapControlsProps> = ({
@@ -44,6 +45,7 @@ const MapControls: React.FC<MapControlsProps> = ({
   onFlyTo,
   liveRadiusKm,
   onRadiusChange,
+  alertCoordinates,    // ← ADD THIS
 }) => {
   const {
     openPanels,
@@ -79,9 +81,8 @@ const MapControls: React.FC<MapControlsProps> = ({
       {/* ── Top-right icon bar ─────────────────────────────────── */}
       <div className="absolute top-4 right-4 z-50 flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 px-2 py-1.5">
 
-        {/* Notification Bell — leftmost */}
         <div className="flex items-center px-1">
-          <NotificationBell />
+          <NotificationBell onFlyTo={onFlyTo} />
         </div>
 
         <div className="w-px h-6 bg-gray-200 mx-0.5" />
@@ -203,6 +204,7 @@ const MapControls: React.FC<MapControlsProps> = ({
               liveRadiusKm={liveRadiusKm}
               onRadiusChange={onRadiusChange}
               isPlacingAlert={isPlacingAlert}
+              coordinates={alertCoordinates}   // ← WIRED IN
             />
           </div>
         </DraggableWindow>

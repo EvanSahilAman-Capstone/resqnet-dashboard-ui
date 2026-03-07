@@ -4,12 +4,16 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import NotificationDropdown from './NotificationDropdown';
 
-const NotificationBell: React.FC = () => {
-  const { user }                           = useAuth0();
-  const { notifications, dismiss, remove } = useNotifications();
-  const [open, setOpen]                    = useState(false);
-  const ref                                = useRef<HTMLDivElement>(null);
-  const role = (user as any)?.['https://resqnet.com/role'] ?? 'Users';
+interface Props {
+  onFlyTo?: (lat: number, lng: number) => void;
+}
+
+const NotificationBell: React.FC<Props> = ({ onFlyTo }) => {
+  const { user }                                    = useAuth0();
+  const { notifications, dismiss, remove, clearAll } = useNotifications();
+  const [open, setOpen]                             = useState(false);
+  const ref                                         = useRef<HTMLDivElement>(null);
+  const role  = (user as any)?.['https://resqnet.com/role'] ?? 'Users';
   const count = notifications.length;
 
   useEffect(() => {
@@ -41,7 +45,9 @@ const NotificationBell: React.FC = () => {
           role={role}
           onDismiss={dismiss}
           onDelete={remove}
+          onClearAll={clearAll}
           onClose={() => setOpen(false)}
+          onFlyTo={onFlyTo}
         />
       )}
     </div>

@@ -20,6 +20,7 @@ const Dashboard: React.FC = () => {
   const [pendingBroadcast, setPendingBroadcast] = useState<BroadcastMessage | null>(null);
   const [broadcastLoading, setBroadcastLoading] = useState(false);
   const [draftRadiusKm, setDraftRadiusKm]       = useState(1);
+  const [alertCoordinates, setAlertCoordinates] = useState<[number, number] | undefined>(undefined);
 
   const [hasRoute, setHasRoute]                             = useState(false);
   const [isSelectingDestination, setIsSelectingDestination] = useState(false);
@@ -34,6 +35,33 @@ const Dashboard: React.FC = () => {
   const flyToFn           = useRef<(lat: number, lng: number) => void>(() => {});
 
   const isBroadcastPanelOpen = openPanels.has("broadcast") && broadcastSub === "create";
+
+  // ── Normalize WS broadcast payload (handles nested or flat shapes) ─────────
+  const normalizeBroadcast = (b: any): BroadcastAlert | null => {
+    // unwrap if nested under details/data
+    const raw = b?.details ?? b?.data ?? b;
+
+    console.log("[WS] raw broadcast payload:", raw); // ← remove after confirming
+
+    const id       = raw._id || raw.id || raw.broadcast_id;
+    const coords   = raw.coordinates || raw.position;
+    const priority = (raw.priority || "low").toUpperCase() as BroadcastAlert["priority"];
+
+    if (!id || !coords) {
+      console.warn("[WS] broadcast missing id or coords, skipping:", raw);
+      return null;
+    }
+
+    return {
+      id,
+      position:  coords as [number, number],
+      radius:    raw.radius   || 1,
+      priority,
+      message:   raw.message  || "",
+      timestamp: raw.timestamp || new Date().toISOString(),
+      status:    (raw.status  || "ACTIVE") as BroadcastAlert["status"],
+    };
+  };
 
   // ── Sensor mapper ──────────────────────────────────────────────
   const mapBackendToSensor = (backend: any): Sensor => {
@@ -105,37 +133,37 @@ const Dashboard: React.FC = () => {
     };
     fetchBroadcasts();
     return () => { isMounted = false; };
-    // no polling interval — WebSocket handles live updates
   }, [fetchWithAuth]);
 
- // ── Real-time broadcast updates via WebSocket ──────────────────
-useBroadcastSocket(
-  // created → add to map
-  (b) => setBroadcastAlerts((prev) => {
-    if (prev.find((a) => a.id === b._id)) return prev;
-    return [...prev, {
-      id:        b._id,
-      position:  b.coordinates as [number, number],
-      radius:    b.radius,
-      priority:  (b.priority as string).toUpperCase() as BroadcastAlert["priority"],
-      message:   b.message,
-      timestamp: b.timestamp,
-      status:    b.status as BroadcastAlert["status"],
-    }];
-  }),
-  // updated → update in place
-  (b) => setBroadcastAlerts((prev) =>
-    prev.map((a) => a.id === b._id ? {
-      ...a,
-      message:  b.message,
-      radius:   b.radius,
-      priority: (b.priority as string).toUpperCase() as BroadcastAlert["priority"],
-      status:   b.status as BroadcastAlert["status"],
-    } : a)
-  ),
-  // deleted/resolved → remove from map
-  (id) => setBroadcastAlerts((prev) => prev.filter((a) => a.id !== id)),
-);
+  // ── Real-time broadcast updates via WebSocket ──────────────────
+  useBroadcastSocket(
+    // created
+    (b) => {
+      const alert = normalizeBroadcast(b);
+      if (!alert) return;
+      setBroadcastAlerts((prev) => {
+        if (prev.find((a) => a.id === alert.id)) return prev; // dedup
+        return [...prev, alert];
+      });
+    },
+    // updated
+    (b) => {
+      const raw = b?.details ?? b?.data ?? b;
+      const id  = raw._id || raw.id;
+      if (!id) return;
+      setBroadcastAlerts((prev) =>
+        prev.map((a) => a.id === id ? {
+          ...a,
+          message:  raw.message  ?? a.message,
+          radius:   raw.radius   ?? a.radius,
+          priority: raw.priority ? (raw.priority as string).toUpperCase() as BroadcastAlert["priority"] : a.priority,
+          status:   raw.status   ?? a.status,
+        } : a)
+      );
+    },
+    // deleted
+    (id) => setBroadcastAlerts((prev) => prev.filter((a) => a.id !== id)),
+  );
 
   // ── Broadcast handlers ─────────────────────────────────────────
   const handleBroadcastDraftChange = (draft: BroadcastMessage) => {
@@ -147,22 +175,28 @@ useBroadcastSocket(
     setPendingBroadcast(data);
     setDraftRadiusKm(data.radius);
     setIsPlacingAlert(true);
+    setAlertCoordinates(undefined);
   };
 
   const handleCancelBroadcast = () => {
     setIsPlacingAlert(false);
     setPendingBroadcast(null);
+    setAlertCoordinates(undefined);
   };
 
   const handleMapClick = async (lat: number, lng: number) => {
     if (!pendingBroadcast) return;
+
+    const coords: [number, number] = [lat, lng];
+    setAlertCoordinates(coords);
     setIsPlacingAlert(false);
     setBroadcastLoading(true);
+
     try {
       const broadcastData = {
         ...pendingBroadcast,
         radius:      draftRadiusKm,
-        coordinates: [lat, lng],
+        coordinates: coords,
         priority:    pendingBroadcast.priority.toLowerCase(),
       };
       const result = await fetchWithAuth("/broadcast", {
@@ -170,13 +204,12 @@ useBroadcastSocket(
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(broadcastData),
       });
-      // WebSocket will handle adding to map via useBroadcastSocket
-      // but add optimistically in case WS is slow
+      // Optimistic update — WS will dedup via normalizeBroadcast
       setBroadcastAlerts((prev) => [
         ...prev,
         {
           id:        result.broadcast_id,
-          position:  [lat, lng] as [number, number],
+          position:  coords,
           radius:    draftRadiusKm,
           priority:  pendingBroadcast.priority,
           message:   pendingBroadcast.message,
@@ -248,14 +281,12 @@ useBroadcastSocket(
     <div className="h-screen w-full">
       <div className="relative h-full w-full">
 
-        {/* Incidents panel */}
         <IncidentsPanel
           fires={fires}
           loading={loading}
           onFlyTo={(lat, lng) => flyToFn.current(lat, lng)}
         />
 
-        {/* Full-area Map */}
         <Map
           fires={wildfireEvents}
           evacuationRoute={evacRoute}
@@ -285,7 +316,6 @@ useBroadcastSocket(
           }}
         />
 
-        {/* Map controls + floating windows */}
         <MapControls
           fires={fires}
           isPlacingAlert={isPlacingAlert}
@@ -305,6 +335,7 @@ useBroadcastSocket(
           onCycleSensors={() => cycleSensorsFn.current()}
           onGoToLocation={() => goToLocationFn.current()}
           onFlyTo={(lat: number, lng: number) => flyToFn.current(lat, lng)}
+          alertCoordinates={alertCoordinates}
         />
 
       </div>
