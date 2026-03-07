@@ -13,6 +13,7 @@ export interface BroadcastAlert {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   message: string;
   timestamp?: string;
+  status?: 'ACTIVE' | 'UPDATED' | 'RESOLVED';
 }
 
 export interface Sensor {
@@ -66,3 +67,4 @@ export interface MapProps {
   onFlyToRef?: (fn: (lat: number, lng: number) => void) => void;
   onDraftRadiusChange?: (r: number) => void;
 }
+

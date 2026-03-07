@@ -4,6 +4,7 @@ import DraggableWindow from "./DraggableWindow";
 import LegendPanel from "./LegendPanel";
 import BroadcastAlertsPanel from "./BroadcastAlertsPanel";
 import BroadcastForm from "./BroadcastForm";
+import NotificationBell from "./notifications/NotificationBell";
 import type { BroadcastAlert } from "../components/map";
 import type { FireReport } from "../hooks/useLocalData";
 import type { BroadcastMessage } from "./BroadcastForm";
@@ -54,9 +55,7 @@ const MapControls: React.FC<MapControlsProps> = ({
     incidentsOpen,
   } = usePanels();
 
-  // Keep a ref to latest form data so onActivate can submit it
   const latestFormData = useRef<BroadcastMessage | null>(null);
-
   const [showBroadcastMenu, setShowBroadcastMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -77,8 +76,15 @@ const MapControls: React.FC<MapControlsProps> = ({
 
   return (
     <>
-      {/* Top-right icon bar */}
+      {/* ── Top-right icon bar ─────────────────────────────────── */}
       <div className="absolute top-4 right-4 z-50 flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 px-2 py-1.5">
+
+        {/* Notification Bell — leftmost */}
+        <div className="flex items-center px-1">
+          <NotificationBell />
+        </div>
+
+        <div className="w-px h-6 bg-gray-200 mx-0.5" />
 
         {/* Incidents */}
         <button
@@ -152,7 +158,7 @@ const MapControls: React.FC<MapControlsProps> = ({
         </button>
       </div>
 
-      {/* Broadcast Alerts List window */}
+      {/* ── Broadcast Alerts List window ───────────────────────── */}
       {openPanels.has("broadcast") && broadcastSub === "list" && (
         <DraggableWindow
           id="broadcast_list"
@@ -165,7 +171,7 @@ const MapControls: React.FC<MapControlsProps> = ({
         </DraggableWindow>
       )}
 
-      {/* Create Broadcast window */}
+      {/* ── Create Broadcast window ────────────────────────────── */}
       {openPanels.has("broadcast") && broadcastSub === "create" && (
         <DraggableWindow
           id="broadcast_create"
@@ -188,7 +194,6 @@ const MapControls: React.FC<MapControlsProps> = ({
                 onBroadcastCancel();
                 closePanel("broadcast");
               }}
-              // ── KEY FIX: onActivate submits latest form data ──
               onActivate={() => {
                 if (latestFormData.current) {
                   onBroadcastSubmit(latestFormData.current);
@@ -203,19 +208,7 @@ const MapControls: React.FC<MapControlsProps> = ({
         </DraggableWindow>
       )}
 
-      {/* Legend window */}
-      {openPanels.has("broadcast") && broadcastSub === "list" && (
-        <DraggableWindow
-          id="broadcast_list"
-          title="Broadcast Alerts"
-          onClose={() => closePanel("broadcast")}
-          defaultPosition={{ x: 500, y: 70 }}
-          defaultSize={{ w: 320, h: 480 }}
-        >
-          <BroadcastAlertsPanel alerts={broadcastAlerts} onFlyTo={onFlyTo} />
-        </DraggableWindow>
-      )}
-
+      {/* ── Legend window ──────────────────────────────────────── */}
       {openPanels.has("legend") && (
         <DraggableWindow
           id="legend"

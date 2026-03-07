@@ -7,11 +7,12 @@ import type { BroadcastMessage } from "../components/BroadcastForm.tsx";
 import { useApi } from "../utils/api";
 import IncidentsPanel from "../components/IncidentsPanel";
 import { usePanels } from "../context/PanelContext";
+import { useBroadcastSocket } from "../hooks/useBroadcasts";
 
 const Dashboard: React.FC = () => {
   const { fires, evacRoute, setEvacRoute, loading } = useLocalData() as any;
   const { fetchWithAuth } = useApi();
-  const { incidentsOpen, openPanels, broadcastSub  } = usePanels();
+  const { incidentsOpen, openPanels, broadcastSub } = usePanels();
 
   const [broadcastAlerts, setBroadcastAlerts]   = useState<BroadcastAlert[]>([]);
   const [sensors, setSensors]                   = useState<Sensor[]>([]);
@@ -31,8 +32,6 @@ const Dashboard: React.FC = () => {
   const cycleSensorsFn    = useRef<() => void>(() => {});
   const goToLocationFn    = useRef<() => void>(() => {});
   const flyToFn           = useRef<(lat: number, lng: number) => void>(() => {});
-
-  // Derived — broadcast panel is open when "broadcast" panel + "create" sub is active
 
   const isBroadcastPanelOpen = openPanels.has("broadcast") && broadcastSub === "create";
 
@@ -82,7 +81,7 @@ const Dashboard: React.FC = () => {
     return () => { isMounted = false; clearInterval(interval); };
   }, [fetchWithAuth]);
 
-  // ── Broadcasts polling ─────────────────────────────────────────
+  // ── Broadcasts initial fetch ───────────────────────────────────
   useEffect(() => {
     let isMounted = true;
     const fetchBroadcasts = async () => {
@@ -97,6 +96,7 @@ const Dashboard: React.FC = () => {
           priority:  (b.priority || "low").toUpperCase() as BroadcastAlert["priority"],
           message:   b.message,
           timestamp: b.timestamp || null,
+          status:    b.status || "ACTIVE",
         }));
         setBroadcastAlerts(alerts);
       } catch (err) {
@@ -104,9 +104,38 @@ const Dashboard: React.FC = () => {
       }
     };
     fetchBroadcasts();
-    const interval = setInterval(fetchBroadcasts, 10000);
-    return () => { isMounted = false; clearInterval(interval); };
+    return () => { isMounted = false; };
+    // no polling interval — WebSocket handles live updates
   }, [fetchWithAuth]);
+
+ // ── Real-time broadcast updates via WebSocket ──────────────────
+useBroadcastSocket(
+  // created → add to map
+  (b) => setBroadcastAlerts((prev) => {
+    if (prev.find((a) => a.id === b._id)) return prev;
+    return [...prev, {
+      id:        b._id,
+      position:  b.coordinates as [number, number],
+      radius:    b.radius,
+      priority:  (b.priority as string).toUpperCase() as BroadcastAlert["priority"],
+      message:   b.message,
+      timestamp: b.timestamp,
+      status:    b.status as BroadcastAlert["status"],
+    }];
+  }),
+  // updated → update in place
+  (b) => setBroadcastAlerts((prev) =>
+    prev.map((a) => a.id === b._id ? {
+      ...a,
+      message:  b.message,
+      radius:   b.radius,
+      priority: (b.priority as string).toUpperCase() as BroadcastAlert["priority"],
+      status:   b.status as BroadcastAlert["status"],
+    } : a)
+  ),
+  // deleted/resolved → remove from map
+  (id) => setBroadcastAlerts((prev) => prev.filter((a) => a.id !== id)),
+);
 
   // ── Broadcast handlers ─────────────────────────────────────────
   const handleBroadcastDraftChange = (draft: BroadcastMessage) => {
@@ -141,6 +170,8 @@ const Dashboard: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(broadcastData),
       });
+      // WebSocket will handle adding to map via useBroadcastSocket
+      // but add optimistically in case WS is slow
       setBroadcastAlerts((prev) => [
         ...prev,
         {
@@ -150,6 +181,7 @@ const Dashboard: React.FC = () => {
           priority:  pendingBroadcast.priority,
           message:   pendingBroadcast.message,
           timestamp: new Date().toISOString(),
+          status:    "ACTIVE",
         },
       ]);
     } catch (err) {
