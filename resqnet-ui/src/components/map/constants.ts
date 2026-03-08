@@ -30,3 +30,13 @@ export const getConfidenceLabel = (score?: number): string => {
   if (score >= 40)   return 'Low';
   return 'Very Low';
 };
+
+export const SENSOR_LOCATION_NAMES: Record<string, string> = {
+  SENSOR_001: "Dryden Fire Center",
+  SENSOR_002: "Red Lake",
+  SENSOR_003: "Sioux Lookout",
+  SENSOR_004: "Thunder Bay",
+  SENSOR_005: "Timmins",
+  SENSOR_006: "Cochrane",
+  SENSOR_007: "Pickle Lake",
+}

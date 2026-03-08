@@ -1,9 +1,5 @@
 import React from "react";
-<<<<<<< HEAD
 import type { BroadcastAlert } from "../components/map";
-=======
-import type { BroadcastAlert } from "./map";
->>>>>>> 1bcb1bd2c2cb4b1e35297c91f34d5f01e30c26cb
 import alertGif from "../assets/alert.gif";
 import { Clock, MapPin, Radio, ChevronDown } from "lucide-react";
 

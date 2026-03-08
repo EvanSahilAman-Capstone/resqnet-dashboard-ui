@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useApi } from "../utils/api";
+import { SENSOR_LOCATION_NAMES } from "../components/map/constants";
 
 export interface Sensor {
   id: string;
@@ -14,6 +15,7 @@ export interface Sensor {
   battery: number;
   lastPing: string;
   containerId?: string;
+  locationName: string;
 }
 
 const Sensors: React.FC = () => {
@@ -38,10 +40,12 @@ const Sensors: React.FC = () => {
   };
 
   const mapBackendToSensor = (backend: any): Sensor => {
-    const ageSec = Date.now() / 1000 - backend.last_seen || 99999; // Fallback
+    const lastSeen = Number(backend.last_seen ?? 0);
+    const ageSec = lastSeen > 0 ? Date.now() / 1000 - lastSeen : 99999;
+
     let status: Sensor["status"] = "OFFLINE";
-    if (ageSec < 60) status = "ONLINE";
-    else if (ageSec < 300) status = "WARNING";
+    if (ageSec < 90) status = "ONLINE";
+    else if (ageSec < 420) status = "WARNING";
 
     return {
       id: backend.id || "unknown",
@@ -49,12 +53,13 @@ const Sensors: React.FC = () => {
       status,
       latitude: Number(backend.lat) || 0,
       longitude: Number(backend.lng) || 0,
-      health: 100, // Backend doesn't provide
+      health: 100,                                    // Backend doesn't provide
       temperature: Number(backend.temperature) || 0,
-      humidity: Number(backend.smoke_level) || 0, // Map smoke_level to humidity
+      humidity: Number(backend.humidity) || 0, 
       battery: Number(backend.battery_level) || 100,
-      lastPing: new Date((backend.last_seen || 0) * 1000).toISOString(),
+      lastPing: lastSeen > 0 ? new Date(lastSeen * 1000).toISOString() : new Date(0).toISOString(),
       containerId: backend.container_id,
+      locationName: SENSOR_LOCATION_NAMES[backend.id] || "Unknown Location",
     };
   };
 
@@ -83,10 +88,26 @@ const Sensors: React.FC = () => {
     }
   }, [fetchWithAuth]);
 
+  // Polls every 30 seconds after each completed request
   useEffect(() => {
-    fetchSensors();
-    const interval = setInterval(fetchSensors, 10000); // 10s not 5s
-    return () => clearInterval(interval);
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async () => {
+      if (cancelled) return;
+
+      await fetchSensors();
+
+      if (!cancelled) {
+        timeoutId = setTimeout(poll, 30000);
+      }
+    };
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [fetchSensors]); // Stable callback
 
   return (
@@ -185,6 +206,7 @@ const Sensors: React.FC = () => {
                     {selectedSensor.status}
                   </span>
                 </div>
+                <span className="px-3 py-1 rounded-full text-sm font-semibold text-red-900">{selectedSensor.locationName}</span>
               </div>
 
               {/* Metrics Table */}
