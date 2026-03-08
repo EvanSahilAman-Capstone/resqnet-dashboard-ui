@@ -14,13 +14,14 @@ const Dashboard: React.FC = () => {
   const { fetchWithAuth } = useApi();
   const { incidentsOpen, openPanels, broadcastSub } = usePanels();
 
-  const [broadcastAlerts, setBroadcastAlerts]   = useState<BroadcastAlert[]>([]);
-  const [sensors, setSensors]                   = useState<Sensor[]>([]);
-  const [isPlacingAlert, setIsPlacingAlert]     = useState(false);
-  const [pendingBroadcast, setPendingBroadcast] = useState<BroadcastMessage | null>(null);
-  const [broadcastLoading, setBroadcastLoading] = useState(false);
-  const [draftRadiusKm, setDraftRadiusKm]       = useState(1);
-  const [alertCoordinates, setAlertCoordinates] = useState<[number, number] | undefined>(undefined);
+  const [broadcastAlerts, setBroadcastAlerts]     = useState<BroadcastAlert[]>([]);
+  const [sensors, setSensors]                     = useState<Sensor[]>([]);
+  const [isPlacingAlert, setIsPlacingAlert]       = useState(false);
+  const [pendingBroadcast, setPendingBroadcast]   = useState<BroadcastMessage | null>(null);
+  const [broadcastLoading, setBroadcastLoading]   = useState(false);
+  const [draftRadiusKm, setDraftRadiusKm]         = useState(1);
+  const [alertCoordinates, setAlertCoordinates]   = useState<[number, number] | undefined>(undefined);
+  const [selectedBroadcast, setSelectedBroadcast] = useState<BroadcastAlert | null>(null);
 
   const [hasRoute, setHasRoute]                             = useState(false);
   const [isSelectingDestination, setIsSelectingDestination] = useState(false);
@@ -36,30 +37,29 @@ const Dashboard: React.FC = () => {
 
   const isBroadcastPanelOpen = openPanels.has("broadcast") && broadcastSub === "create";
 
-  // ── Normalize WS broadcast payload (handles nested or flat shapes) ─────────
+  // ── Normalize WS broadcast payload ────────────────────────────
   const normalizeBroadcast = (b: any): BroadcastAlert | null => {
-    // unwrap if nested under details/data
-    const raw = b?.details ?? b?.data ?? b;
-
-    console.log("[WS] raw broadcast payload:", raw); // ← remove after confirming
-
+    const raw      = b?.details ?? b?.data ?? b;
     const id       = raw._id || raw.id || raw.broadcast_id;
     const coords   = raw.coordinates || raw.position;
     const priority = (raw.priority || "low").toUpperCase() as BroadcastAlert["priority"];
-
     if (!id || !coords) {
       console.warn("[WS] broadcast missing id or coords, skipping:", raw);
       return null;
     }
-
     return {
       id,
-      position:  coords as [number, number],
-      radius:    raw.radius   || 1,
+      position:    coords as [number, number],
+      radius:      raw.radius       || 1,
       priority,
-      message:   raw.message  || "",
-      timestamp: raw.timestamp || new Date().toISOString(),
-      status:    (raw.status  || "ACTIVE") as BroadcastAlert["status"],
+      message:     raw.message      || "",
+      timestamp:   raw.timestamp    || new Date().toISOString(),
+      status:      (raw.status      || "ACTIVE") as BroadcastAlert["status"],
+      description: raw.description  ?? undefined,
+      createdBy:   raw.created_by   ?? undefined,
+      updatedBy:   raw.updated_by   ?? undefined,
+      updatedAt:   raw.updated_at   ?? undefined,
+      logs:        raw.logs         ?? [],
     };
   };
 
@@ -118,13 +118,18 @@ const Dashboard: React.FC = () => {
         const list = Array.isArray(data?.broadcasts) ? data.broadcasts : [];
         if (!isMounted) return;
         const alerts: BroadcastAlert[] = list.map((b: any, idx: number) => ({
-          id:        b._id || b.id || `broadcast-${idx}`,
-          position:  b.coordinates || [44.5, -79.5],
-          radius:    b.radius || 1,
-          priority:  (b.priority || "low").toUpperCase() as BroadcastAlert["priority"],
-          message:   b.message,
-          timestamp: b.timestamp || null,
-          status:    b.status || "ACTIVE",
+          id:          b._id || b.id || `broadcast-${idx}`,
+          position:    b.coordinates || [44.5, -79.5],
+          radius:      b.radius      || 1,
+          priority:    (b.priority   || "low").toUpperCase() as BroadcastAlert["priority"],
+          message:     b.message,
+          timestamp:   b.timestamp   || null,
+          status:      b.status      || "ACTIVE",
+          description: b.description ?? undefined,
+          createdBy:   b.created_by  ?? undefined,
+          updatedBy:   b.updated_by  ?? undefined,
+          updatedAt:   b.updated_at  ?? undefined,
+          logs:        b.logs        ?? [],
         }));
         setBroadcastAlerts(alerts);
       } catch (err) {
@@ -142,7 +147,7 @@ const Dashboard: React.FC = () => {
       const alert = normalizeBroadcast(b);
       if (!alert) return;
       setBroadcastAlerts((prev) => {
-        if (prev.find((a) => a.id === alert.id)) return prev; // dedup
+        if (prev.find((a) => a.id === alert.id)) return prev;
         return [...prev, alert];
       });
     },
@@ -156,13 +161,30 @@ const Dashboard: React.FC = () => {
           ...a,
           message:  raw.message  ?? a.message,
           radius:   raw.radius   ?? a.radius,
-          priority: raw.priority ? (raw.priority as string).toUpperCase() as BroadcastAlert["priority"] : a.priority,
+          priority: raw.priority
+            ? (raw.priority as string).toUpperCase() as BroadcastAlert["priority"]
+            : a.priority,
           status:   raw.status   ?? a.status,
         } : a)
       );
+      setSelectedBroadcast((prev) => {
+        if (!prev || prev.id !== id) return prev;
+        return {
+          ...prev,
+          message:  raw.message  ?? prev.message,
+          radius:   raw.radius   ?? prev.radius,
+          priority: raw.priority
+            ? (raw.priority as string).toUpperCase() as BroadcastAlert["priority"]
+            : prev.priority,
+          status: (raw.status ?? prev.status) as BroadcastAlert["status"],
+        } satisfies BroadcastAlert;
+      });
     },
     // deleted
-    (id) => setBroadcastAlerts((prev) => prev.filter((a) => a.id !== id)),
+    (id) => {
+      setBroadcastAlerts((prev) => prev.filter((a) => a.id !== id));
+      setSelectedBroadcast((prev) => prev?.id === id ? null : prev);
+    },
   );
 
   // ── Broadcast handlers ─────────────────────────────────────────
@@ -186,12 +208,10 @@ const Dashboard: React.FC = () => {
 
   const handleMapClick = async (lat: number, lng: number) => {
     if (!pendingBroadcast) return;
-
     const coords: [number, number] = [lat, lng];
     setAlertCoordinates(coords);
     setIsPlacingAlert(false);
     setBroadcastLoading(true);
-
     try {
       const broadcastData = {
         ...pendingBroadcast,
@@ -204,7 +224,6 @@ const Dashboard: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(broadcastData),
       });
-      // Optimistic update — WS will dedup via normalizeBroadcast
       setBroadcastAlerts((prev) => [
         ...prev,
         {
@@ -215,15 +234,25 @@ const Dashboard: React.FC = () => {
           message:   pendingBroadcast.message,
           timestamp: new Date().toISOString(),
           status:    "ACTIVE",
+          logs:      [],
         },
       ]);
     } catch (err) {
       console.error("Broadcast error:", err);
-      alert("Error sending broadcast");
+      window.alert("Error sending broadcast");
     } finally {
       setPendingBroadcast(null);
       setBroadcastLoading(false);
     }
+  };
+
+  // ── Broadcast detail handlers ──────────────────────────────────
+  const handleBroadcastSaved = (updated: BroadcastAlert) => {
+    setBroadcastAlerts((prev) => prev.map((a) => a.id === updated.id ? updated : a));
+  };
+
+  const handleBroadcastDeleted = (id: string) => {
+    setBroadcastAlerts((prev) => prev.filter((a) => a.id !== id));
   };
 
   // ── Wildfire event mapper ──────────────────────────────────────
@@ -245,11 +274,11 @@ const Dashboard: React.FC = () => {
 
   const handleRequestRouteFromPinned = async () => {
     if (!destinationPin) {
-      alert("Please select a destination by clicking Pin, then clicking on the map.");
+      window.alert("Please select a destination by clicking Pin, then clicking on the map.");
       return;
     }
     if (!userLocation) {
-      alert("User location not available yet.");
+      window.alert("User location not available yet.");
       return;
     }
     try {
@@ -263,7 +292,7 @@ const Dashboard: React.FC = () => {
       setRouteSafetyScore(result.safety_score);
     } catch (err) {
       console.error("Evacuation route error", err);
-      alert("Could not calculate evacuation route");
+      window.alert("Could not calculate evacuation route");
     }
   };
 
@@ -314,6 +343,7 @@ const Dashboard: React.FC = () => {
             setDraftRadiusKm(r);
             setPendingBroadcast((prev) => prev ? { ...prev, radius: r } : prev);
           }}
+          onBroadcastDetail={(a: BroadcastAlert) => setSelectedBroadcast(a)}
         />
 
         <MapControls
@@ -336,6 +366,10 @@ const Dashboard: React.FC = () => {
           onGoToLocation={() => goToLocationFn.current()}
           onFlyTo={(lat: number, lng: number) => flyToFn.current(lat, lng)}
           alertCoordinates={alertCoordinates}
+          selectedBroadcast={selectedBroadcast}
+          onDetailClose={() => setSelectedBroadcast(null)}
+          onBroadcastSaved={handleBroadcastSaved}
+          onBroadcastDeleted={handleBroadcastDeleted}
         />
 
       </div>
@@ -344,3 +378,4 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+

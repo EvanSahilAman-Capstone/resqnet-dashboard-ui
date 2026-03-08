@@ -1,11 +1,12 @@
 import React from "react";
 import type { BroadcastAlert } from "../components/map";
 import alertGif from "../assets/alert.gif";
-import { Clock, MapPin, Radio, ChevronDown, CheckCircle, RefreshCw } from "lucide-react";
+import { Clock, MapPin, Radio, ChevronDown, Info } from "lucide-react";
 
 interface BroadcastAlertsPanelProps {
-  alerts: BroadcastAlert[];
-  onFlyTo?: (lat: number, lng: number) => void;
+  alerts:      BroadcastAlert[];
+  onFlyTo?:    (lat: number, lng: number) => void;
+  onMoreInfo?: (alert: BroadcastAlert) => void;  // ← NEW
 }
 
 const priorityConfig = {
@@ -15,35 +16,27 @@ const priorityConfig = {
   URGENT: { badge: "bg-red-100 text-red-800 border border-red-300",          label: "URGENT" },
 };
 
-const statusIcon = (status?: string) => {
-  if (status === "RESOLVED") return <CheckCircle size={11} className="text-green-500 shrink-0" />;
-  if (status === "UPDATED")  return <RefreshCw   size={11} className="text-yellow-500 shrink-0" />;
-  return null;
-};
-
-const BroadcastAlertsPanel: React.FC<BroadcastAlertsPanelProps> = ({ alerts, onFlyTo }) => {
+const BroadcastAlertsPanel: React.FC<BroadcastAlertsPanelProps> = ({
+  alerts, onFlyTo, onMoreInfo
+}) => {
   return (
     <div className="divide-y divide-gray-100">
       {alerts.length === 0 && (
         <div className="px-4 py-6 text-center text-gray-400 text-sm">No broadcasts yet.</div>
       )}
-
       {alerts.map((alert) => {
-        const cfg = priorityConfig[(alert.priority as keyof typeof priorityConfig)] ?? priorityConfig["LOW"];
+        const cfg = priorityConfig[alert.priority] ?? priorityConfig["LOW"];
         const ts  = alert.timestamp ? new Date(alert.timestamp) : null;
 
         return (
           <div key={alert.id} className="px-4 py-3 hover:bg-gray-50 transition-colors">
             <div className="flex items-start gap-3">
-              <img src={alertGif} alt="" className="w-7 h-7 shrink-0 mt-0.5" />
+              <img src={alertGif} alt="alert" className="w-7 h-7 shrink-0 mt-0.5" />
 
               <div className="flex-1 min-w-0">
-                {/* Row 1: message + status icon + badge */}
+                {/* Row 1: message + badge */}
                 <div className="flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {statusIcon(alert.status)}
-                    <p className="font-semibold text-gray-800 text-sm truncate">{alert.message}</p>
-                  </div>
+                  <p className="font-semibold text-gray-800 text-sm truncate">{alert.message}</p>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${cfg.badge}`}>
                     {cfg.label}
                   </span>
@@ -73,17 +66,29 @@ const BroadcastAlertsPanel: React.FC<BroadcastAlertsPanelProps> = ({ alerts, onF
                   </button>
                 </div>
 
-                {/* Row 3: timestamp */}
-                {ts && (
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
-                    <Clock size={11} className="shrink-0" />
-                    <span>
-                      {ts.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                      {" · "}
-                      {ts.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                    </span>
-                  </div>
-                )}
+                {/* Row 3: timestamp + More Info */}
+                <div className="flex items-center justify-between mt-0.5">
+                  {ts ? (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <Clock size={11} className="shrink-0" />
+                      <span>
+                        {ts.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                        {" · "}
+                        {ts.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                      </span>
+                    </div>
+                  ) : <span />}
+
+                  {onMoreInfo && (
+                    <button
+                      onClick={() => onMoreInfo(alert)}
+                      className="flex items-center gap-1 text-[11px] text-orange-500 hover:text-orange-700 font-medium transition-colors"
+                    >
+                      <Info size={11} />
+                      More Info
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
