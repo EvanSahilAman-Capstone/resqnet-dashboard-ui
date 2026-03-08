@@ -18,7 +18,7 @@ export interface BroadcastAlert {
   createdBy?:   { email: string | null; name: string | null; user_id: string };
   updatedBy?:   { email: string | null; name: string | null; user_id: string } | null;
   updatedAt?:   string | null;
-  logs?:        { message: string; updated_by: any; timestamp: string }[];
+  logs?:        { message: string; updated_by: string; timestamp: string }[];
 }
 
 export interface Sensor {
@@ -73,4 +73,15 @@ export interface MapProps {
   onFlyToRef?:                 (fn: (lat: number, lng: number) => void) => void;
   onDraftRadiusChange?:        (r: number) => void;
   onBroadcastDetail?:          (alert: BroadcastAlert) => void;
+}
+
+export interface BackendSensor {
+  id?: string;
+  last_seen?: number | string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  temperature?: number | string | null;
+  humidity?: number | string | null;
+  battery_level?: number | string | null;
+  container_id?: string | null;
 }
