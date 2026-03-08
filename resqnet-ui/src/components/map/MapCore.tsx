@@ -38,6 +38,7 @@ const MapCore: React.FC<MapProps> = ({
   onCycleSensorsRef,
   onGoToLocationRef,
   onFlyToRef,
+  onBroadcastDetail,
 }) => {
   const mapRef     = useRef<MapRef | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -48,12 +49,12 @@ const MapCore: React.FC<MapProps> = ({
   const internalRadiusRef = useRef(draftRadiusKm);
   const mapLoadedRef      = useRef(false);
 
-  const [viewState, setViewState]               = useState({ longitude: -79.5, latitude: 44.5, zoom: 10 });
-  const [userLocation, setUserLocation]         = useState<[number, number] | null>(null);
+  const [viewState, setViewState]                     = useState({ longitude: -79.5, latitude: 44.5, zoom: 10 });
+  const [userLocation, setUserLocation]               = useState<[number, number] | null>(null);
   const [initialUserLocation, setInitialUserLocation] = useState<[number, number] | null>(null);
-  const [popupInfo, setPopupInfo]               = useState<PopupInfo | null>(null);
-  const [mousePosition, setMousePosition]       = useState<[number, number] | null>(null);
-  const [pendingPlacement, setPendingPlacement] = useState<{
+  const [popupInfo, setPopupInfo]                     = useState<PopupInfo | null>(null);
+  const [mousePosition, setMousePosition]             = useState<[number, number] | null>(null);
+  const [pendingPlacement, setPendingPlacement]       = useState<{
     lngLat: [number, number];
     screen: { x: number; y: number };
   } | null>(null);
@@ -88,26 +89,19 @@ const MapCore: React.FC<MapProps> = ({
   // ── Native click handler ─────────────────────────────────────
   const handleNativeClick = useCallback((e: MapMouseEvent) => {
     if (!isPlacingRef.current) return;
-
     const map = mapRef.current?.getMap() as MapboxMap | undefined;
     if (!map) return;
-
     const { lng, lat } = e.lngLat;
-
-    const center = map.project([lng, lat]);
+    const center      = map.project([lng, lat]);
     const metersPerPx = 156543.03392 * Math.cos((lat * Math.PI) / 180)
       / Math.pow(2, map.getZoom());
     const radiusPx = (internalRadiusRef.current * 1000) / metersPerPx;
-    const wrapper = wrapperRef.current;
-    const rect = wrapper?.getBoundingClientRect();
-    const screenX = (rect?.left ?? 0) + center.x + radiusPx * 0.707;
-    const screenY = (rect?.top  ?? 0) + center.y - radiusPx * 0.707;
-
+    const wrapper  = wrapperRef.current;
+    const rect     = wrapper?.getBoundingClientRect();
+    const screenX  = (rect?.left ?? 0) + center.x + radiusPx * 0.707;
+    const screenY  = (rect?.top  ?? 0) + center.y - radiusPx * 0.707;
     pendingRef.current = true;
-    setPendingPlacement({
-      lngLat: [lng, lat],
-      screen: { x: screenX, y: screenY },
-    });
+    setPendingPlacement({ lngLat: [lng, lat], screen: { x: screenX, y: screenY } });
   }, []);
 
   // ── Native mousemove handler ─────────────────────────────────
@@ -265,14 +259,15 @@ const MapCore: React.FC<MapProps> = ({
           userLocation={userLocation}
           destinationPin={destinationPin}
           onPopup={setPopupInfo}
+          onBroadcastDetail={onBroadcastDetail ?? (() => {})}
         />
         <MapLayers
           broadcastAlerts={broadcastAlerts}
-          evacuationRoute={evacuationRoute}
+          evacuationRoute={evacuationRoute ?? []}
           evacuationSafetyScore={evacuationSafetyScore}
           mousePosition={pendingPlacement ? pendingPlacement.lngLat : mousePosition}
           draftRadiusKm={internalRadius}
-          draftPriority={draftPriority}
+          draftPriority={draftPriority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'}
           showDraftCircle={isBroadcastPanelOpen || isPlacingAlert}
         />
         <MapPopup info={popupInfo} onClose={() => setPopupInfo(null)} />
@@ -298,7 +293,7 @@ const MapCore: React.FC<MapProps> = ({
         </div>
       )}
 
-      {/* ── ✓ / ✕ — monochrome, at circle top-right edge ── */}
+      {/* ── ✓ / ✕ confirmation buttons ── */}
       {pendingPlacement && (
         <div
           className="fixed z-[9999] flex gap-2"
@@ -308,7 +303,6 @@ const MapCore: React.FC<MapProps> = ({
             transform: 'translate(-50%, -50%)',
           }}
         >
-          {/* ✕ */}
           <button
             type="button"
             onClick={() => {
@@ -321,7 +315,6 @@ const MapCore: React.FC<MapProps> = ({
           >
             <X size={16} />
           </button>
-          {/* ✓ */}
           <button
             type="button"
             onClick={() => {
