@@ -25,10 +25,10 @@ const STATUS_STYLE: Record<string, string> = {
 
 // ── Nav sections ───────────────────────────────────────────────
 const NAV = [
-  { id: "details", icon: FileText, label: "Details"  },
-  { id: "mapping", icon: Map,      label: "Location" },
-  { id: "audit",   icon: User,     label: "Audit"    },
-  { id: "logs",    icon: Activity, label: "Logs"     },
+  { id: "details", icon: FileText, label: ""  },
+  { id: "mapping", icon: Map,      label: "" },
+  { id: "audit",   icon: User,     label: ""    },
+  { id: "logs",    icon: Activity, label: ""     },
 ];
 
 // ── Inline editable field ──────────────────────────────────────
