@@ -75,7 +75,7 @@ const Sensors: React.FC = () => {
       status,
       latitude: Number(backend.lat) || 0,
       longitude: Number(backend.lng) || 0,
-      health: 100,
+      health: status == "ONLINE" ? 100 : 0,
       temperature: Number(backend.temperature) || 0,
       humidity: Number(backend.humidity) || 0,
       battery: Number(backend.battery_level) || 100,
@@ -403,7 +403,7 @@ const Sensors: React.FC = () => {
                   <MetricTile
                     label="Health"
                     value={`${selectedSensor.health}%`}
-                    subtext="Currently static"
+                    subtext=""
                   />
                 </div>
 
