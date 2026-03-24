@@ -1,66 +1,115 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
+import { useAuth0 } from "@auth0/auth0-react";
 
-const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+const WS_BASE = import.meta.env.VITE_WS_URL;
 
 type WSMessage = { event: string; data: any };
-type Listener  = (data: any) => void;
+type Listener = (data: any) => void;
 
 interface WebSocketContextType {
-  subscribe:   (event: string, fn: Listener) => () => void;
-  joinTeam:    (teamId: string) => void;
-  leaveTeam:   (teamId: string) => void;
-  connected:   boolean;
+  subscribe: (event: string, fn: Listener) => () => void;
+  connected: boolean;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
-export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { getAccessTokenSilently, isAuthenticated } = useAuth0();
-  const wsRef        = useRef<WebSocket | null>(null);
+export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const { getAccessTokenSilently, isAuthenticated, user } = useAuth0();
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
   const listenersRef = useRef<Map<string, Set<Listener>>>(new Map());
   const [connected, setConnected] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
+  const subscribe = useCallback((event: string, fn: Listener) => {
+    if (!listenersRef.current.has(event)) {
+      listenersRef.current.set(event, new Set());
+    }
+    listenersRef.current.get(event)!.add(fn);
 
-    let ws: WebSocket;
+    return () => {
+      listenersRef.current.get(event)?.delete(fn);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !WS_BASE) return;
+
+    let cancelled = false;
 
     const connect = async () => {
-      const token = await getAccessTokenSilently();
-      ws = new WebSocket(`${WS_BASE}/ws?token=${token}`);
-      wsRef.current = ws;
+      try {
+        const token = await getAccessTokenSilently();
+        if (cancelled) return;
 
-      ws.onopen  = () => setConnected(true);
-      ws.onclose = () => { setConnected(false); setTimeout(connect, 3000); };
-      ws.onerror = (e) => console.error('WS error:', e);
+        const params = new URLSearchParams({
+          token,
+          userId: user?.sub || "",
+          role: user?.["http://resqnet.com/role"] || "",
+        });
+        const ws = new WebSocket(`${WS_BASE}?${params.toString()}`);
+        wsRef.current = ws;
 
-      ws.onmessage = (e) => {
-        const msg: WSMessage = JSON.parse(e.data);
-        console.log('[WS IN]', msg.event, msg.data);  // ← TEMPORARY DEBUG
-        const handlers = listenersRef.current.get(msg.event);
-        handlers?.forEach((fn) => fn(msg.data));
-      };
+        ws.onopen = () => {
+          setConnected(true);
+          console.log("[WS] connected");
+        };
+
+        ws.onclose = (e) => {
+          setConnected(false);
+          console.log("[WS] disconnected", e.code, e.reason);
+
+          if (!cancelled) {
+            reconnectTimerRef.current = window.setTimeout(connect, 3000);
+          }
+        };
+        ws.onerror = (e) => {
+          console.error("[WS] error:", e);
+        };
+
+        ws.onmessage = (e) => {
+          try {
+            const msg: WSMessage = JSON.parse(e.data);
+            const handlers = listenersRef.current.get(msg.event);
+            handlers?.forEach((fn) => fn(msg.data));
+          } catch (err) {
+            console.error("[WS] invalid message:", e.data, err);
+          }
+        };
+      } catch (err) {
+        console.error("[WS] connect failed:", err);
+
+        if (!cancelled) {
+          reconnectTimerRef.current = window.setTimeout(connect, 3000);
+        }
+      }
     };
 
     connect();
-    return () => { ws?.close(); };
-  }, [isAuthenticated]);
 
-  const subscribe = (event: string, fn: Listener) => {
-    if (!listenersRef.current.has(event)) listenersRef.current.set(event, new Set());
-    listenersRef.current.get(event)!.add(fn);
-    return () => listenersRef.current.get(event)?.delete(fn);
-  };
+    return () => {
+      cancelled = true;
+      setConnected(false);
 
-  const joinTeam  = (teamId: string) =>
-    wsRef.current?.send(JSON.stringify({ action: 'join_team', team_id: teamId }));
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current);
+      }
 
-  const leaveTeam = (teamId: string) =>
-    wsRef.current?.send(JSON.stringify({ action: 'leave_team', team_id: teamId }));
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
+  }, [isAuthenticated, getAccessTokenSilently, user]);
 
   return (
-    <WebSocketContext.Provider value={{ subscribe, joinTeam, leaveTeam, connected }}>
+    <WebSocketContext.Provider value={{ subscribe, connected }}>
       {children}
     </WebSocketContext.Provider>
   );
@@ -68,6 +117,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
 export const useWebSocketContext = () => {
   const ctx = useContext(WebSocketContext);
-  if (!ctx) throw new Error('useWebSocketContext must be used inside WebSocketProvider');
+  if (!ctx)
+    throw new Error(
+      "useWebSocketContext must be used inside WebSocketProvider",
+    );
   return ctx;
 };

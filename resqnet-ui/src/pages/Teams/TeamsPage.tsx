@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Users } from 'lucide-react';
 import { useApi } from "../../utils/api";
-import { useAuth0 } from '@auth0/auth0-react';
+// import { useAuth0 } from '@auth0/auth0-react';
 import TeamMembers from './TeamMembers';
 import InviteModal from './InviteModal';
 
@@ -17,13 +17,13 @@ interface Team {
 
 const TeamsPage: React.FC = () => {
   const { fetchWithAuth }           = useApi();
-  const { user }                    = useAuth0();
+  // const { user }                    = useAuth0();
   const [team, setTeam]             = useState<Team | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [loading, setLoading]       = useState(true);
 
-  const role    = (user as any)?.['https://resqnet.com/role'] ?? 'Users';
-  const isAdmin = role === 'Admin';
+  // const role    = (user as any)?.['https://resqnet.com/role'] ?? 'Users';
+  // const isAdmin = role === 'Admin';
 
   useEffect(() => {
     const load = async () => {
@@ -37,7 +37,7 @@ const TeamsPage: React.FC = () => {
       }
     };
     load();
-  }, []);
+  },);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">

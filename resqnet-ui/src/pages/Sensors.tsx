@@ -237,7 +237,7 @@ const Sensors: React.FC = () => {
                 </p>
               </div>
             ) : sensors.length === 0 ? (
-              <div className="border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+              <div className="border border-slate-300 bg-white p-10 text-center shadow-sm">
                 <div className="mb-4 text-4xl">📡</div>
                 <h3 className="text-xl font-semibold text-slate-900">
                   No Sensors Detected
@@ -273,7 +273,7 @@ const Sensors: React.FC = () => {
                         key={sensor.id}
                         type="button"
                         onClick={() => setSelectedSensor(sensor)}
-                        className={`w-full rounded-2xl border p-4 text-left transition duration-200 focus:outline-none ${
+                        className={`w-full border p-4 text-left transition duration-200 focus:outline-none ${
                           isSelected
                             ? "border-blue-500 bg-blue-50 shadow-md"
                             : `bg-white hover:border-slate-400 hover:shadow-md ${statusStyles.accent}`
@@ -424,7 +424,7 @@ const Sensors: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex h-full min-h-[420px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
+              <div className="flex h-full min-h-[420px] flex-col items-center justify-center border border-slate-300 bg-white p-12 text-center shadow-sm">
                 <div className="mb-6 text-6xl text-slate-300">📡</div>
                 <h3 className="text-2xl font-semibold text-slate-900">
                   Select a Sensor

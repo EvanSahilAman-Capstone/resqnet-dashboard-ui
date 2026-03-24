@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Send, UserPlus, CheckCircle, Shield, Crown, Link } from 'lucide-react';
 import { useApi } from "../../utils/api";
-import { useAuth0 } from '@auth0/auth0-react';
+// import { useAuth0 } from '@auth0/auth0-react';
 
 interface Props {
   teamId:  string;
@@ -10,7 +10,7 @@ interface Props {
 
 const InviteModal: React.FC<Props> = ({ teamId, onClose }) => {
   const { fetchWithAuth }     = useApi();
-  const { user }              = useAuth0();
+  // const { user }              = useAuth0();
   const [email, setEmail]     = useState('');
   const [role, setRole]       = useState<'Responder' | 'Admin'>('Responder');
   const [sent, setSent]       = useState(false);
@@ -18,10 +18,10 @@ const InviteModal: React.FC<Props> = ({ teamId, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied]   = useState(false);
 
-  const role_user = (user as any)?.['https://resqnet.com/role'] ?? 'Users';
+  // const role_user = (user as any)?.['https://resqnet.com/role'] ?? 'Users';
 
   // Only Admins can send invites — Responders see a read-only invite link
-  const isAdmin = role_user === 'Admin';
+  // const isAdmin = role_user === 'Admin';
 
   const submit = async () => {
     if (!email.trim()) return;
