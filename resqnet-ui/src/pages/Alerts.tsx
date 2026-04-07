@@ -4,36 +4,42 @@ import FireReportCard from "../components/FireReportCard";
 import { useApi } from "../utils/api";
 import type { BroadcastAlert } from "../components/map/types";
 import {
-  Radio, Flame, RefreshCw, AlertTriangle,
-  CheckCircle2, XCircle, Activity, Loader2,
+  Radio,
+  Flame,
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Activity,
+  Loader2,
 } from "lucide-react";
 
 // ── FireReport type (local — not in types.ts yet) ──────────────
 interface FireReport {
-  report_id:      string;
-  photo_link:     string;
-  hazard_type:    string;
+  report_id: string;
+  photo_link: string;
+  hazard_type: string;
   uploading_user: string;
-  coordinates:    [number, number];
-  severity:       "low" | "medium" | "high";
-  timestamp:      string;
+  coordinates: [number, number];
+  severity: "low" | "medium" | "high";
+  timestamp: string;
 }
 
 // ── Severity pill styles ───────────────────────────────────────
 const SEV: Record<string, string> = {
-  low:    "bg-gray-100 text-gray-500 border-gray-300",
+  low: "bg-gray-100 text-gray-500 border-gray-300",
   medium: "bg-amber-50 text-amber-700 border-amber-300",
-  high:   "bg-red-50 text-red-600 border-red-300",
+  high: "bg-red-50 text-red-600 border-red-300",
 };
 
 // ── Section header ─────────────────────────────────────────────
 const SectionHeader: React.FC<{
-  icon:      React.ReactNode;
-  title:     string;
-  count?:    number;
-  loading:   boolean;
+  icon: React.ReactNode;
+  title: string;
+  count?: number;
+  loading: boolean;
   onRefresh: () => void;
-  accent:    string;
+  accent: string;
 }> = ({ icon, title, count, loading, onRefresh, accent }) => (
   <div className="flex items-center justify-between mb-5">
     <div className="flex items-center gap-3">
@@ -50,8 +56,12 @@ const SectionHeader: React.FC<{
       </div>
       <div className="flex items-center gap-1.5 ml-2">
         <span className="relative flex h-2 w-2">
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 ${loading ? "bg-gray-400" : "bg-orange-400"}`} />
-          <span className={`relative inline-flex rounded-full h-2 w-2 ${loading ? "bg-gray-300" : "bg-orange-500"}`} />
+          <span
+            className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 ${loading ? "bg-gray-400" : "bg-orange-400"}`}
+          />
+          <span
+            className={`relative inline-flex rounded-full h-2 w-2 ${loading ? "bg-gray-300" : "bg-orange-500"}`}
+          />
         </span>
         <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
           {loading ? "syncing" : "live"}
@@ -94,9 +104,9 @@ const SkeletonGrid: React.FC = () => (
 // ── Main page ──────────────────────────────────────────────────
 function Alerts() {
   const { fetchWithAuth } = useApi();
-  const [alerts, setAlerts]                 = useState<BroadcastAlert[]>([]);
-  const [fireReports, setFireReports]       = useState<FireReport[]>([]);
-  const [loading, setLoading]               = useState(true);
+  const [alerts, setAlerts] = useState<BroadcastAlert[]>([]);
+  const [fireReports, setFireReports] = useState<FireReport[]>([]);
+  const [loading, setLoading] = useState(true);
   const [reportsLoading, setReportsLoading] = useState(true);
 
   // ── Fetchers ─────────────────────────────────────────────────
@@ -105,20 +115,24 @@ function Alerts() {
       setLoading(true);
       const data = await fetchWithAuth("/broadcasts");
       // API returns snake_case — normalise to BroadcastAlert shape
-      const normalised: BroadcastAlert[] = (data.broadcasts || []).map((b: any) => ({
-        id:          b._id ?? b.id,
-        position:    b.coordinates ?? b.position,
-        radius:      b.radius,
-        priority:    (b.priority as string).toUpperCase() as BroadcastAlert["priority"],
-        message:     b.message,
-        timestamp:   b.timestamp,
-        status:      b.status ?? "ACTIVE",
-        description: b.description ?? null,
-        createdBy:   b.created_by ?? b.createdBy ?? null,
-        updatedBy:   b.updated_by ?? b.updatedBy ?? null,
-        updatedAt:   b.updated_at ?? b.updatedAt ?? null,
-        logs:        b.logs ?? [],
-      }));
+      const normalised: BroadcastAlert[] = (data.broadcasts || []).map(
+        (b: any) => ({
+          id: b._id ?? b.id,
+          position: b.coordinates ?? b.position,
+          radius: b.radius,
+          priority: (
+            b.priority as string
+          ).toUpperCase() as BroadcastAlert["priority"],
+          message: b.message,
+          timestamp: b.timestamp,
+          status: b.status ?? "ACTIVE",
+          description: b.description ?? null,
+          createdBy: b.created_by ?? b.createdBy ?? null,
+          updatedBy: b.updated_by ?? b.updatedBy ?? null,
+          updatedAt: b.updated_at ?? b.updatedAt ?? null,
+          logs: b.logs ?? [],
+        }),
+      );
       setAlerts(normalised);
     } catch (err) {
       console.error("Failed to fetch alerts:", err);
@@ -155,48 +169,81 @@ function Alerts() {
   };
 
   const handleUpdate = async (id: string, updated: BroadcastAlert) => {
+  try {
+    const result = await fetchWithAuth(`/broadcasts/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: updated.message,
+        radius: updated.radius,
+        priority: updated.priority.toLowerCase(),
+        coordinates: updated.position,
+        // ✅ No timestamp
+      }),
+    });
+    
+    setAlerts((prev) =>
+      prev.map((a) =>
+        a.id === id
+          ? {
+              ...updated,
+              id,
+              updatedAt: result.broadcast?.updated_at ?? new Date().toISOString(),
+            }
+          : a
+      )
+    );
+  } catch (err) {
+    console.error("Update error:", err);
+  }
+};
+  
+  const handleVerifyReport = async (reportId: string) => {
+    const prevReports = fireReports;
+    setFireReports((prev) => prev.filter((r) => r.report_id !== reportId));
+
     try {
-      const result = await fetchWithAuth(`/broadcasts/${id}`, {
-        method:  "PUT",
+      const res = await fetchWithAuth(`/fires/${reportId}/verify`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message:     updated.message,
-          radius:      updated.radius,
-          priority:    updated.priority.toLowerCase(),
-          coordinates: updated.position,
-          timestamp:   updated.timestamp,
-        }),
+        body: JSON.stringify({ verified: true }),
       });
-      setAlerts((prev) =>
-        prev.map((a) =>
-          a.id === id
-            ? { ...updated, id, updatedAt: result.broadcast?.updated_at ?? new Date().toISOString() }
-            : a
-        )
-      );
+
+      const data = await res.json();
+      if (data.broadcast_created) {
+        console.log("✅ Broadcast created:", data.broadcast_id);
+        fetchAlerts();
+      }
     } catch (err) {
-      console.error("Update error:", err);
+      setFireReports(prevReports);
+      fetchFireReports();
+      console.error("Verify failed:", err);
     }
   };
 
-  const handleDeleteReport = (reportId: string) => {
+  const handleDeleteReport = async (reportId: string) => {
+    const prevReports = fireReports;
     setFireReports((prev) => prev.filter((r) => r.report_id !== reportId));
-  };
 
-  const handleVerifyReport = (reportId: string) => {
-    console.log("Verified report:", reportId);
+    try {
+      await fetchWithAuth(`/fires/${reportId}`, { method: "DELETE" });
+      console.log("✅ Rejected:", reportId);
+    } catch (err) {
+      setFireReports(prevReports);
+      fetchFireReports();
+      console.error("Reject failed:", err);
+    }
   };
 
   // ── Stats ─────────────────────────────────────────────────────
   const urgentCount = alerts.filter((a) => a.priority === "URGENT").length;
-  const highFires   = fireReports.filter((r) => r.severity === "high").length;
+  const highFires = fireReports.filter((r) => r.severity === "high").length;
 
   return (
     // ↓ KEY FIX: overflow-y-auto + h-full instead of min-h-screen
     // Assumes this page is rendered inside a layout that fills the viewport.
     // If this IS the root, use: className="h-screen overflow-y-auto"
     <div className="h-full overflow-y-auto bg-white text-gray-900">
-
       {/* ── Sticky command bar ───────────────────────────────── */}
       <div className="border-b border-gray-200 bg-white/95 backdrop-blur-sm sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
@@ -209,26 +256,34 @@ function Alerts() {
             </div>
             <div className="h-4 w-px bg-gray-200" />
             <div className="flex items-center gap-2">
-              <span className={`flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-md border ${
-                urgentCount > 0
-                  ? "bg-red-50 border-red-200 text-red-500"
-                  : "bg-gray-50 border-gray-200 text-gray-400"
-              }`}>
+              <span
+                className={`flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-md border ${
+                  urgentCount > 0
+                    ? "bg-red-50 border-red-200 text-red-500"
+                    : "bg-gray-50 border-gray-200 text-gray-400"
+                }`}
+              >
                 <Radio size={10} />
                 {loading ? "—" : alerts.length} broadcasts
                 {urgentCount > 0 && (
-                  <span className="ml-1 font-semibold">· {urgentCount} urgent</span>
+                  <span className="ml-1 font-semibold">
+                    · {urgentCount} urgent
+                  </span>
                 )}
               </span>
-              <span className={`flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-md border ${
-                highFires > 0
-                  ? "bg-orange-50 border-orange-200 text-orange-500"
-                  : "bg-gray-50 border-gray-200 text-gray-400"
-              }`}>
+              <span
+                className={`flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-md border ${
+                  highFires > 0
+                    ? "bg-orange-50 border-orange-200 text-orange-500"
+                    : "bg-gray-50 border-gray-200 text-gray-400"
+                }`}
+              >
                 <Flame size={10} />
                 {reportsLoading ? "—" : fireReports.length} reports
                 {highFires > 0 && (
-                  <span className="ml-1 font-semibold">· {highFires} high sev</span>
+                  <span className="ml-1 font-semibold">
+                    · {highFires} high sev
+                  </span>
                 )}
               </span>
             </div>
@@ -237,11 +292,13 @@ function Alerts() {
             <Loader2
               size={11}
               className={`text-orange-500 transition-opacity ${
-                (loading || reportsLoading) ? "animate-spin opacity-100" : "opacity-0"
+                loading || reportsLoading
+                  ? "animate-spin opacity-100"
+                  : "opacity-0"
               }`}
             />
             <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
-              {(loading || reportsLoading) ? "syncing..." : "all systems nominal"}
+              {loading || reportsLoading ? "syncing..." : "all systems nominal"}
             </span>
           </div>
         </div>
@@ -249,7 +306,6 @@ function Alerts() {
 
       {/* ── Scrollable body ──────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-12">
-
         {/* Broadcast Alerts */}
         <section>
           <SectionHeader
@@ -261,7 +317,9 @@ function Alerts() {
             accent="bg-orange-50 border-orange-200"
           />
           {loading && <SkeletonGrid />}
-          {!loading && alerts.length === 0 && <EmptyState label="broadcast alerts" />}
+          {!loading && alerts.length === 0 && (
+            <EmptyState label="broadcast alerts" />
+          )}
           {!loading && alerts.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {alerts.map((a) => (
@@ -300,7 +358,9 @@ function Alerts() {
             accent="bg-red-50 border-red-200"
           />
           {reportsLoading && <SkeletonGrid />}
-          {!reportsLoading && fireReports.length === 0 && <EmptyState label="fire reports" />}
+          {!reportsLoading && fireReports.length === 0 && (
+            <EmptyState label="fire reports" />
+          )}
           {!reportsLoading && fireReports.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {fireReports.map((report) => (
@@ -308,11 +368,15 @@ function Alerts() {
                   key={report.report_id}
                   className="rounded-xl border border-gray-200 bg-white hover:border-red-200 hover:shadow-md transition-all overflow-hidden shadow-sm flex flex-col"
                 >
-                  <div className={`h-0.5 w-full ${
-                    report.severity === "high"   ? "bg-red-500" :
-                    report.severity === "medium" ? "bg-amber-400" :
-                                                   "bg-gray-300"
-                  }`} />
+                  <div
+                    className={`h-0.5 w-full ${
+                      report.severity === "high"
+                        ? "bg-red-500"
+                        : report.severity === "medium"
+                          ? "bg-amber-400"
+                          : "bg-gray-300"
+                    }`}
+                  />
                   <div className="flex-1">
                     <FireReportCard
                       report_id={report.report_id}
@@ -325,7 +389,9 @@ function Alerts() {
                     />
                   </div>
                   <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/60 flex items-center gap-2">
-                    <div className={`text-[10px] font-mono px-2 py-0.5 rounded-md border uppercase tracking-wider mr-auto ${SEV[report.severity]}`}>
+                    <div
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-md border uppercase tracking-wider mr-auto ${SEV[report.severity]}`}
+                    >
                       {report.severity}
                     </div>
                     <button
@@ -346,7 +412,6 @@ function Alerts() {
             </div>
           )}
         </section>
-
       </div>
     </div>
   );

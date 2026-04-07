@@ -179,8 +179,9 @@ const handleHazardSubmit = async (e: React.FormEvent) => {
       coordinates: [44.5, -79.5],
       photo_link: final_photo_url,
       severity: 'medium',
-      timestamp: new Date().toISOString(),    
-      verified: false                  
+      verified: false,
+      description: hazardDesc,
+      timestamp: new Date().toISOString(),
     };
     
     await fetchWithAuth('/reports', {
