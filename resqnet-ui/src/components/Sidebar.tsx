@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import {
   HomeIcon, BellIcon, SignalIcon,
-  UserCircleIcon, ArrowRightEndOnRectangleIcon
+  UserCircleIcon, ArrowRightEndOnRectangleIcon, DevicePhoneMobileIcon
 } from '@heroicons/react/24/outline';
 import { Users } from 'lucide-react';
 import { useAuth0 } from '@auth0/auth0-react';
@@ -123,6 +123,28 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogoutClick }) => {
           </NavLink>
         )}
       </div>
+
+      {/* Mobile View (temporary) */}
+        <NavLink
+          to="/mobile"
+          className={({ isActive }) =>
+            `group relative flex justify-center p-3 rounded-xl hover:shadow-md hover:scale-[1.05] transition-all duration-200 active:scale-[0.98]
+             ${isActive
+               ? 'bg-emerald-50/80 text-emerald-600 border-emerald-200/60 shadow-md border'
+               : 'text-gray-600 hover:bg-emerald-50/80 hover:text-emerald-600 border-transparent'
+             }`
+          }
+          title="Mobile"
+        >
+          {({ isActive }) => (
+            <>
+              <DevicePhoneMobileIcon className={`size-6 transition-opacity ${isActive ? 'opacity-100' : 'opacity-75 group-hover:opacity-100'}`} />
+              <span className="invisible absolute left-full top-1/2 ms-3 -translate-y-1/2 whitespace-nowrap rounded-xl bg-gray-900/95 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-sm border border-gray-800/50 group-hover:visible z-50">
+                Mobile
+              </span>
+            </>
+          )}
+        </NavLink>
 
       {/* Bottom: Profile + Logout */}
       <div className="px-2 py-4 border-t border-gray-100/50 bg-white/50 backdrop-blur-sm space-y-2">

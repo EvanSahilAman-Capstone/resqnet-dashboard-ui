@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Alerts from './pages/Alerts'
 import Sensors from './pages/Sensors'
 import TeamsPage from './pages/Teams/TeamsPage'
+import MobileView from './pages/MobileView'
 import { Login } from './pages/Login'
 import Layout from './components/Layout'
 import { PanelProvider } from './context/PanelContext'
@@ -39,6 +40,7 @@ function App() {
               <Route path="alerts"    element={<Alerts />} />
               <Route path="sensors"   element={<Sensors />} />
               <Route path="teams"     element={<TeamsPage />} />
+              <Route path="mobile"    element={<MobileView />} />
               <Route path="*"         element={<Navigate to="/dashboard" replace />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
