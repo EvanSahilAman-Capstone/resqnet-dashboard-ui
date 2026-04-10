@@ -533,10 +533,13 @@ function Alerts() {
     } catch (err) { console.error("Update error:", err); }
   };
 
+  // ── THE FIX: notify Dashboard map to refetch after any review ────────────────
   const handleReviewDone = (reportId: string, decision: string) => {
     setReviewTarget(null);
     setFireReports((prev) => prev.filter((r) => r.report_id !== reportId));
     if (decision === "verify_and_change_to_incident") fetchIncidents();
+    window.dispatchEvent(new CustomEvent("fire-report-reviewed"));
+    console.log("[Alerts] dispatched fire-report-reviewed for", reportId, decision);
   };
 
   const handleIncidentStatusChange = (id: string, newStatus: string) => {

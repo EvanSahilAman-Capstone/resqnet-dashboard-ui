@@ -4,19 +4,19 @@ import type { Map as MapboxMap, MapMouseEvent } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Navigation, Check, X } from 'lucide-react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { useIncidents } from '../../hooks/useLocalData';
 
-import MapMarkers    from './MapMarkers';
-import MapLayers     from './MapLayers';
-import MapPopup      from './MapPopup';
+import MapMarkers     from './MapMarkers';
+import MapLayers      from './MapLayers';
+import MapPopup       from './MapPopup';
 import MapStylePicker from './MapStylePicker';
-import MapRoutingBar from './MapRoutingBar';
-import MapOverlays   from './MapOverlays';
+import MapRoutingBar  from './MapRoutingBar';
+import MapOverlays    from './MapOverlays';
 import { MAP_STYLES } from './constants';
-import type { MapProps, PopupInfo, FireReport, Incident } from './types';
-import { usePopulation }        from '../../hooks/usePopulation';
-import { useMapTraffic }        from '../../hooks/useMapTraffic';
-import { useCountyBoundaries }  from '../../hooks/useCountyBoundaries';
-import { useApi }               from '../../utils/api';
+import type { MapProps, PopupInfo } from './types';
+import { usePopulation }       from '../../hooks/usePopulation';
+import { useMapTraffic }       from '../../hooks/useMapTraffic';
+import { useCountyBoundaries } from '../../hooks/useCountyBoundaries';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -108,31 +108,18 @@ const MapCore: React.FC<MapProps> = ({
   const [internalRadius, setInternalRadius]   = useState(draftRadiusKm);
   const [mapLoaded, setMapLoaded]             = useState(false);
 
-  // ── Incidents fetched directly inside MapCore ─────────────────────────────
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const { fetchWithAuth } = useApi();
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchWithAuth('/incidents')
-      .then((data: any) => {
-        if (!cancelled)
-          setIncidents(Array.isArray(data) ? data : (data.incidents ?? []));
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [fetchWithAuth]);
+  // ── Incidents via hook ────────────────────────────────────────────────────
+  const { incidents } = useIncidents();
 
   const activeStyle = MAP_STYLES.find((s) => s.id === activeStyleId) ?? MAP_STYLES[0]!;
 
   const { getAccessTokenSilently, isAuthenticated } = useAuth0();
 
   // ── Imperative layer hooks ────────────────────────────────────────────────
-  const { setShowPopulation, rehydrate: rehydratePop }       = usePopulation(mapRef, mapLoaded, getAccessTokenSilently, isAuthenticated);
-  const { setShowTraffic,    rehydrate: rehydrateTraffic }   = useMapTraffic(mapRef, mapLoaded);
-  const { setShowCounties,   rehydrate: rehydrateCounties }  = useCountyBoundaries(mapRef, mapLoaded);
+  const { setShowPopulation, rehydrate: rehydratePop }      = usePopulation(mapRef, mapLoaded, getAccessTokenSilently, isAuthenticated);
+  const { setShowTraffic,    rehydrate: rehydrateTraffic }  = useMapTraffic(mapRef, mapLoaded);
+  const { setShowCounties,   rehydrate: rehydrateCounties } = useCountyBoundaries(mapRef, mapLoaded);
 
-  // ── Sync layerToggles → hook state ───────────────────────────────────────
   useEffect(() => {
     if (layerToggles?.populationHeatmap !== undefined)
       setShowPopulation(layerToggles.populationHeatmap);
@@ -160,19 +147,18 @@ const MapCore: React.FC<MapProps> = ({
     if (!isPlacingAlert && !isBroadcastPanelOpen) setMousePosition(null);
   }, [isPlacingAlert, isBroadcastPanelOpen]);
 
-  // ── Native click / mousemove handlers ────────────────────────────────────
+  // ── Native click / mousemove ──────────────────────────────────────────────
   const handleNativeClick = useCallback((e: MapMouseEvent) => {
     if (!isPlacingRef.current) return;
     const map = mapRef.current?.getMap() as MapboxMap | undefined;
     if (!map) return;
     const { lng, lat } = e.lngLat;
     const center      = map.project([lng, lat]);
-    const metersPerPx = 156543.03392 * Math.cos((lat * Math.PI) / 180)
-      / Math.pow(2, map.getZoom());
-    const radiusPx = (internalRadiusRef.current * 1000) / metersPerPx;
-    const rect     = wrapperRef.current?.getBoundingClientRect();
-    const screenX  = (rect?.left ?? 0) + center.x + radiusPx * 0.707;
-    const screenY  = (rect?.top  ?? 0) + center.y - radiusPx * 0.707;
+    const metersPerPx = 156543.03392 * Math.cos((lat * Math.PI) / 180) / Math.pow(2, map.getZoom());
+    const radiusPx    = (internalRadiusRef.current * 1000) / metersPerPx;
+    const rect        = wrapperRef.current?.getBoundingClientRect();
+    const screenX     = (rect?.left ?? 0) + center.x + radiusPx * 0.707;
+    const screenY     = (rect?.top  ?? 0) + center.y - radiusPx * 0.707;
     pendingRef.current = true;
     setPendingPlacement({ lngLat: [lng, lat], screen: { x: screenX, y: screenY } });
   }, []);
@@ -191,12 +177,10 @@ const MapCore: React.FC<MapProps> = ({
     map.on('mousemove',  handleNativeMouseMove);
   }, [handleNativeClick, handleNativeMouseMove]);
 
-  // ── flyTo ─────────────────────────────────────────────────────────────────
   const flyTo = useCallback((lng: number, lat: number, zoom = 12) => {
     mapRef.current?.flyTo({ center: [lng, lat], zoom, essential: true });
   }, []);
 
-  // ── Style switch ──────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current?.getMap() as MapboxMap | undefined;
     if (!map) return;
@@ -214,7 +198,6 @@ const MapCore: React.FC<MapProps> = ({
     return () => { map.off('style.load', onStyleLoad); };
   }, [activeStyleId, bindMapListeners, rehydratePop, rehydrateTraffic, rehydrateCounties]);
 
-  // ── Cursor management ─────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current?.getMap() as MapboxMap | undefined;
     if (!map || !mapLoadedRef.current) return;
@@ -223,7 +206,6 @@ const MapCore: React.FC<MapProps> = ({
     else                                      map.getCanvas().style.cursor = '';
   }, [isPlacingAlert, pendingPlacement, isSelectingDestination]);
 
-  // ── Geolocation ───────────────────────────────────────────────────────────
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -236,13 +218,11 @@ const MapCore: React.FC<MapProps> = ({
     );
   }, []);
 
-  // ── Go to user location ───────────────────────────────────────────────────
   const goToUserLocation = useCallback(() => {
     const loc = userLocation ?? initialUserLocation;
     if (loc) flyTo(loc[0], loc[1], 12);
   }, [userLocation, initialUserLocation, flyTo]);
 
-  // ── Imperative ref callbacks ──────────────────────────────────────────────
   useEffect(() => {
     onCycleBroadcastsRef?.(() => {
       if (!broadcastAlerts.length) return;
@@ -277,11 +257,7 @@ const MapCore: React.FC<MapProps> = ({
       <Map
         {...viewState}
         onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
-        onLoad={() => {
-          mapLoadedRef.current = true;
-          setMapLoaded(true);
-          bindMapListeners();
-        }}
+        onLoad={() => { mapLoadedRef.current = true; setMapLoaded(true); bindMapListeners(); }}
         onClick={(e) => {
           if (isSelectingDestination && onSelectDestinationOnMap)
             onSelectDestinationOnMap(e.lngLat.lat, e.lngLat.lng);
@@ -325,9 +301,7 @@ const MapCore: React.FC<MapProps> = ({
       <MapOverlays isSelectingDestination={isSelectingDestination} />
 
       <MapRoutingBar
-        searchInput={destinationPin
-          ? `${destinationPin[0].toFixed(6)}, ${destinationPin[1].toFixed(6)}`
-          : ''}
+        searchInput={destinationPin ? `${destinationPin[0].toFixed(6)}, ${destinationPin[1].toFixed(6)}` : ''}
         hasActiveRoute={hasActiveRoute}
         destinationPin={destinationPin}
         onStartDestinationSelection={onStartDestinationSelection}

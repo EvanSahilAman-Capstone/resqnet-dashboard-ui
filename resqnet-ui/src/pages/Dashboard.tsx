@@ -10,7 +10,7 @@ import { usePanels } from "../context/PanelContext";
 import { useBroadcastSocket } from "../hooks/useBroadcasts";
 
 const Dashboard: React.FC = () => {
-  const { fires, evacRoute, setEvacRoute, loading } = useLocalData() as any;
+  const { fires, evacRoute, setEvacRoute, refetchFires } = useLocalData() as any;
   const { fetchWithAuth } = useApi();
   const { incidentsOpen, openPanels, broadcastSub, layerToggles, customOverlayFile } = usePanels();
 
@@ -37,11 +37,20 @@ const Dashboard: React.FC = () => {
 
   const isBroadcastPanelOpen = openPanels.has("broadcast") && broadcastSub === "create";
 
-  // ── Normalize WS broadcast payload ─────────────────────────────
+  // listen for review completions from Alerts page — refetch fires so stale markers disappear
+  useEffect(() => {
+    const handler = () => {
+      console.log("[Dashboard] fire-report-reviewed event — refetching fires");
+      refetchFires();
+    };
+    window.addEventListener("fire-report-reviewed", handler);
+    return () => window.removeEventListener("fire-report-reviewed", handler);
+  }, [refetchFires]);
+
   const normalizeBroadcast = (b: any): BroadcastAlert | null => {
-    const raw    = b?.details ?? b?.data ?? b;
-    const id     = raw._id || raw.id || raw.broadcast_id;
-    const coords = raw.coordinates || raw.position;
+    const raw      = b?.details ?? b?.data ?? b;
+    const id       = raw._id || raw.id || raw.broadcast_id;
+    const coords   = raw.coordinates || raw.position;
     const priority = (raw.priority || "low").toUpperCase() as BroadcastAlert["priority"];
     if (!id || !coords) {
       console.warn("[WS] broadcast missing id or coords, skipping:", raw);
@@ -63,7 +72,6 @@ const Dashboard: React.FC = () => {
     };
   };
 
-  // ── Sensor mapper ───────────────────────────────────────────────
   const mapBackendToSensor = (backend: any): Sensor => {
     const ageSec = Date.now() / 1000 - backend.last_seen;
     let status: Sensor["status"] = "OFFLINE";
@@ -83,7 +91,6 @@ const Dashboard: React.FC = () => {
     };
   };
 
-  // ── Geolocation ─────────────────────────────────────────────────
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
@@ -91,7 +98,6 @@ const Dashboard: React.FC = () => {
     );
   }, []);
 
-  // ── Sensors polling ─────────────────────────────────────────────
   useEffect(() => {
     let isMounted = true;
     const fetchSensors = async () => {
@@ -109,7 +115,6 @@ const Dashboard: React.FC = () => {
     return () => { isMounted = false; clearInterval(interval); };
   }, [fetchWithAuth]);
 
-  // ── Broadcasts initial fetch ────────────────────────────────────
   useEffect(() => {
     let isMounted = true;
     const fetchBroadcasts = async () => {
@@ -140,7 +145,6 @@ const Dashboard: React.FC = () => {
     return () => { isMounted = false; };
   }, [fetchWithAuth]);
 
-  // ── Real-time broadcast updates via WebSocket ───────────────────
   useBroadcastSocket(
     (b) => {
       const alert = normalizeBroadcast(b);
@@ -184,7 +188,6 @@ const Dashboard: React.FC = () => {
     },
   );
 
-  // ── Broadcast handlers ──────────────────────────────────────────
   const handleBroadcastDraftChange = (draft: BroadcastMessage) => {
     setPendingBroadcast(draft);
     setDraftRadiusKm(draft.radius);
@@ -249,16 +252,21 @@ const Dashboard: React.FC = () => {
   const handleBroadcastDeleted = (id: string) =>
     setBroadcastAlerts((prev) => prev.filter((a) => a.id !== id));
 
-  // ── Wildfire event mapper ───────────────────────────────────────
-  const wildfireEvents = fires.map((fire: any) => ({
-    id:        fire.report_id,
-    latitude:  fire.coordinates[0],
-    longitude: fire.coordinates[1],
-    riskLevel: fire.severity.toUpperCase() as "LOW" | "MEDIUM" | "HIGH" | "EXTREME",
-    message:   `${fire.hazard_type} reported by ${fire.uploading_user}`,
-  }));
+  // safeFireReports — fires already filtered to pending_review in useLocalData,
+  // but double-check coords here before passing to map
+  const safeFireReports = fires.filter((fire: any) => {
+    const lng = fire.coordinates?.[0];
+    const lat = fire.coordinates?.[1];
+    const ok  = typeof lng === 'number' && typeof lat === 'number'
+                && !isNaN(lng) && !isNaN(lat)
+                && lat >= -90 && lat <= 90
+                && lng >= -180 && lng <= 180;
+    if (!ok) console.warn('[Dashboard] fireReport bad coords, excluding:', fire.report_id, fire.coordinates);
+    return ok;
+  });
 
-  // ── Routing handlers ────────────────────────────────────────────
+  console.log(`[Dashboard] fires total=${fires.length} safeFireReports=${safeFireReports.length}`);
+
   const handleStartDestinationSelection = () => setIsSelectingDestination(true);
 
   const handleSelectDestinationOnMap = (lat: number, lng: number) => {
@@ -299,13 +307,12 @@ const Dashboard: React.FC = () => {
       <div className="relative h-full w-full">
 
         <IncidentsPanel
-          fires={fires}
-          loading={loading}
           onFlyTo={(lat, lng) => flyToFn.current(lat, lng)}
         />
 
         <Map
-          fires={wildfireEvents}
+          fires={[]}
+          fireReports={safeFireReports}
           evacuationRoute={evacRoute}
           evacuationSafetyScore={routeSafetyScore}
           broadcastAlerts={broadcastAlerts}

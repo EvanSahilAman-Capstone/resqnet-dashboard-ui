@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApi } from '../utils/api';
 
-
 export interface FireReport {
   _id?:           string;
   report_id:      string;
@@ -61,22 +60,23 @@ export const useLocalData = () => {
   const [evacRoute, setEvacRoute] = useState<[number, number][]>([]);
   const [loading, setLoading]     = useState(true);
 
-  useEffect(() => {
-    const fetchFires = async () => {
-      try {
-        const data: FireReport[] = await fetchWithAuth("/fires");
-        setFires(data);
-      } catch (err) {
-        console.error("Failed to fetch fires:", err);
-        setFires([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFires();
-  }, []);
+  const fetchFires = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data: FireReport[] = await fetchWithAuth("/fires");
+      // only show pending_review on the map
+      setFires(Array.isArray(data) ? data.filter((r) => !r.status || r.status === 'pending_review') : []);
+    } catch (err) {
+      console.error("[useLocalData] fetchFires failed:", err);
+      setFires([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchWithAuth]);
 
-  return { fires, evacRoute, loading, setFires, setEvacRoute };
+  useEffect(() => { fetchFires(); }, [fetchFires]);
+
+  return { fires, evacRoute, loading, setFires, setEvacRoute, refetchFires: fetchFires };
 };
 
 
@@ -93,7 +93,7 @@ export const useIncidents = () => {
       const data = await fetchWithAuth("/incidents");
       setIncidents(Array.isArray(data) ? data : data.incidents ?? []);
     } catch (err) {
-      console.error("Failed to fetch incidents:", err);
+      console.error("[useIncidents] fetchIncidents failed:", err);
       setIncidents([]);
     } finally {
       setLoading(false);
