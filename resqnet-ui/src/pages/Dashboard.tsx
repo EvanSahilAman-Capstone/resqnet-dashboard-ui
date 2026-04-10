@@ -7,48 +7,48 @@ import type { BroadcastMessage } from '../components/BroadcastForm';
 import { useApi } from '../utils/api';
 import IncidentsPanel from '../components/IncidentsPanel';
 import SafeZonesPanel from '../components/SafeZonesPanel';
+import IncidentDetailsPanel from '../components/IncidentDetailsPanel';
 import { usePanels } from '../context/PanelContext';
 import { useBroadcastSocket } from '../hooks/useBroadcasts';
 import { useSafeZoneSocket } from '../hooks/useSafeZones';
 import type { SafeZoneFormData } from '../components/SafeZoneForm';
-import type { FireReport } from '../hooks/useLocalData';
+import type { FireReport, Incident } from '../hooks/useLocalData';
 
 const Dashboard: React.FC = () => {
-  const { fires, evacRoute, setEvacRoute, refetchFires } = useLocalData() as any;
+  const { fires, evacRoute, setEvacRoute, refetchFires, incidents = [] } = useLocalData() as any;
   const { fetchWithAuth } = useApi();
   const { openPanels, layerToggles, customOverlayFile } = usePanels();
 
-  // ── Broadcast state ──────────────────────────────────────────────────────
-  const [broadcastAlerts, setBroadcastAlerts]     = useState<BroadcastAlert[]>([]);
-  const [sensors, setSensors]                     = useState<Sensor[]>([]);
-  const [isPlacingAlert, setIsPlacingAlert]       = useState(false);
-  const [pendingBroadcast, setPendingBroadcast]   = useState<BroadcastMessage | null>(null);
-  const [broadcastLoading, setBroadcastLoading]   = useState(false);
-  const [draftRadiusKm, setDraftRadiusKm]         = useState(1);
-  const [alertCoordinates, setAlertCoordinates]   = useState<[number, number] | undefined>(undefined);
+  const [broadcastAlerts, setBroadcastAlerts] = useState<BroadcastAlert[]>([]);
+  const [sensors, setSensors] = useState<Sensor[]>([]);
+  const [isPlacingAlert, setIsPlacingAlert] = useState(false);
+  const [pendingBroadcast, setPendingBroadcast] = useState<BroadcastMessage | null>(null);
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+  const [draftRadiusKm, setDraftRadiusKm] = useState(1);
+  const [alertCoordinates, setAlertCoordinates] = useState<[number, number] | undefined>(undefined);
   const [selectedBroadcast, setSelectedBroadcast] = useState<BroadcastAlert | null>(null);
 
-  // ── Safe Zone state ──────────────────────────────────────────────────────
-  const [safeZones, setSafeZones]                 = useState<SafeZone[]>([]);
+  const [safeZones, setSafeZones] = useState<SafeZone[]>([]);
   const [isPlacingSafeZone, setIsPlacingSafeZone] = useState(false);
-  const [pendingSafeZone, setPendingSafeZone]     = useState<SafeZoneFormData | null>(null);
-  const [safeZoneLoading, setSafeZoneLoading]     = useState(false);
-  const [safeZoneRadiusM, setSafeZoneRadiusM]     = useState(500);
-  const [safeZoneCoords, setSafeZoneCoords]       = useState<[number, number] | undefined>(undefined);
+  const [pendingSafeZone, setPendingSafeZone] = useState<SafeZoneFormData | null>(null);
+  const [safeZoneLoading, setSafeZoneLoading] = useState(false);
+  const [safeZoneRadiusM, setSafeZoneRadiusM] = useState(500);
+  const [safeZoneCoords, setSafeZoneCoords] = useState<[number, number] | undefined>(undefined);
 
-  // ── Route / map state ────────────────────────────────────────────────────
-  const [hasRoute, setHasRoute]                             = useState(false);
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+
+  const [hasRoute, setHasRoute] = useState(false);
   const [isSelectingDestination, setIsSelectingDestination] = useState(false);
-  const [destinationPin, setDestinationPin]                 = useState<[number, number] | null>(null);
-  const [userLocation, setUserLocation]                     = useState<[number, number] | null>(null);
-  const [routeSafetyScore, setRouteSafetyScore]             = useState<number | undefined>(undefined);
+  const [destinationPin, setDestinationPin] = useState<[number, number] | null>(null);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [routeSafetyScore, setRouteSafetyScore] = useState<number | undefined>(undefined);
 
-  // ── Map ref callbacks ────────────────────────────────────────────────────
+  const cycleIncidentsFn = useRef<() => void>(() => {});
   const cycleBroadcastsFn = useRef<() => void>(() => {});
-  const cycleFiresFn      = useRef<() => void>(() => {});
-  const cycleSensorsFn    = useRef<() => void>(() => {});
-  const goToLocationFn    = useRef<() => void>(() => {});
-  const flyToFn           = useRef<(lat: number, lng: number) => void>(() => {});
+  const cycleFiresFn = useRef<() => void>(() => {});
+  const cycleSensorsFn = useRef<() => void>(() => {});
+  const goToLocationFn = useRef<() => void>(() => {});
+  const flyToFn = useRef<(lat: number, lng: number) => void>(() => {});
 
   const isBroadcastPanelOpen = openPanels.has('broadcast');
 
@@ -59,49 +59,54 @@ const Dashboard: React.FC = () => {
   }, [refetchFires]);
 
   const normalizeBroadcast = (b: any): BroadcastAlert | null => {
-    const raw      = b?.details ?? b?.data ?? b;
-    const id       = raw.id ?? raw.broadcast_id;
-    const coords   = raw.coordinates ?? raw.position;
+    const raw = b?.details ?? b?.data ?? b;
+    const id = raw.id ?? raw.broadcast_id;
+    const coords = raw.coordinates ?? raw.position;
     const priority = (raw.priority ?? 'low').toUpperCase() as BroadcastAlert['priority'];
+
     if (!id || !coords) {
       console.warn('WS broadcast missing id or coords', raw);
       return null;
     }
+
     return {
       id,
-      position:    coords as [number, number],
-      radius:      raw.radius ?? 1,
+      position: coords as [number, number],
+      radius: raw.radius ?? 1,
       priority,
-      message:     raw.message ?? '',
-      timestamp:   raw.timestamp ?? new Date().toISOString(),
-      status:      (raw.status ?? 'ACTIVE') as BroadcastAlert['status'],
+      message: raw.message ?? '',
+      timestamp: raw.timestamp ?? new Date().toISOString(),
+      status: (raw.status ?? 'ACTIVE') as BroadcastAlert['status'],
       description: raw.description ?? undefined,
-      createdBy:   raw.created_by ?? undefined,
-      updatedBy:   raw.updated_by ?? undefined,
-      updatedAt:   raw.updated_at ?? undefined,
-      logs:        raw.logs ?? [],
+      createdBy: raw.created_by ?? undefined,
+      updatedBy: raw.updated_by ?? undefined,
+      updatedAt: raw.updated_at ?? undefined,
+      logs: raw.logs ?? [],
     };
   };
 
   const mapBackendToSensor = (backend: any): Sensor => {
     const ageSec = Date.now() / 1000 - backend.last_seen;
-    const status: Sensor['status'] = ageSec < 60 ? 'ONLINE' : ageSec < 300 ? 'WARNING' : 'OFFLINE';
+    const status: Sensor['status'] =
+      ageSec < 60 ? 'ONLINE' : ageSec < 300 ? 'WARNING' : 'OFFLINE';
+
     return {
-      id:          backend.id,
-      name:        backend.id,
+      id: backend.id,
+      name: backend.id,
       status,
-      latitude:    Number(backend.lat),
-      longitude:   Number(backend.lng),
-      health:      100,
+      latitude: Number(backend.lat),
+      longitude: Number(backend.lng),
+      health: 100,
       temperature: Number(backend.temperature),
-      humidity:    backend.humidity,
-      battery:     100,
-      lastPing:    new Date(backend.last_seen * 1000).toISOString(),
+      humidity: backend.humidity,
+      battery: 100,
+      lastPing: new Date(backend.last_seen * 1000).toISOString(),
     };
   };
 
   useEffect(() => {
     let isMounted = true;
+
     const fetchSensors = async () => {
       try {
         const data = await fetchWithAuth('sensors');
@@ -112,42 +117,54 @@ const Dashboard: React.FC = () => {
         console.error('Failed to fetch sensors', err);
       }
     };
+
     fetchSensors();
     const interval = setInterval(fetchSensors, 10000);
-    return () => { isMounted = false; clearInterval(interval); };
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [fetchWithAuth]);
 
   useEffect(() => {
     let isMounted = true;
+
     const fetchBroadcasts = async () => {
       try {
         const data = await fetchWithAuth('broadcasts');
         const list = Array.isArray(data?.broadcasts) ? data.broadcasts : [];
         if (!isMounted) return;
-        setBroadcastAlerts(list.map((b: any, idx: number) => ({
-          id:          b.id ?? `broadcast-${idx}`,
-          position:    b.coordinates ?? [44.5, -79.5],
-          radius:      b.radius ?? 1,
-          priority:    (b.priority ?? 'low').toUpperCase() as BroadcastAlert['priority'],
-          message:     b.message,
-          timestamp:   b.timestamp ?? null,
-          status:      b.status ?? 'ACTIVE',
-          description: b.description ?? undefined,
-          createdBy:   b.created_by ?? undefined,
-          updatedBy:   b.updated_by ?? undefined,
-          updatedAt:   b.updated_at ?? undefined,
-          logs:        b.logs ?? [],
-        })));
+
+        setBroadcastAlerts(
+          list.map((b: any, idx: number) => ({
+            id: b.id ?? `broadcast-${idx}`,
+            position: b.coordinates ?? [44.5, -79.5],
+            radius: b.radius ?? 1,
+            priority: (b.priority ?? 'low').toUpperCase() as BroadcastAlert['priority'],
+            message: b.message,
+            timestamp: b.timestamp ?? null,
+            status: b.status ?? 'ACTIVE',
+            description: b.description ?? undefined,
+            createdBy: b.created_by ?? undefined,
+            updatedBy: b.updated_by ?? undefined,
+            updatedAt: b.updated_at ?? undefined,
+            logs: b.logs ?? [],
+          }))
+        );
       } catch (err) {
         console.error('Failed to fetch broadcasts', err);
       }
     };
+
     fetchBroadcasts();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [fetchWithAuth]);
 
   useEffect(() => {
     let isMounted = true;
+
     const fetchSafeZones = async () => {
       try {
         const data = await fetchWithAuth('safe-zones');
@@ -160,8 +177,11 @@ const Dashboard: React.FC = () => {
         }
       }
     };
+
     fetchSafeZones();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [fetchWithAuth]);
 
   useEffect(() => {
@@ -176,32 +196,38 @@ const Dashboard: React.FC = () => {
       const alert = normalizeBroadcast(b);
       if (!alert) return;
       setBroadcastAlerts((prev) =>
-        prev.find((a) => a.id === alert.id) ? prev : [...prev, alert],
+        prev.find((a) => a.id === alert.id) ? prev : [...prev, alert]
       );
     },
     (b) => {
       const raw = b?.details ?? b?.data ?? b;
-      const id  = raw.id ?? raw.broadcast_id;
+      const id = raw.id ?? raw.broadcast_id;
       if (!id) return;
+
       setBroadcastAlerts((prev) =>
-        prev.map((a) => a.id !== id ? a : {
-          ...a,
-          message:  raw.message ?? a.message,
-          radius:   raw.radius ?? a.radius,
-          priority: raw.priority
-            ? (raw.priority as string).toUpperCase() as BroadcastAlert['priority']
-            : a.priority,
-          status: raw.status ?? a.status,
-        }),
+        prev.map((a) =>
+          a.id !== id
+            ? a
+            : {
+                ...a,
+                message: raw.message ?? a.message,
+                radius: raw.radius ?? a.radius,
+                priority: raw.priority
+                  ? ((raw.priority as string).toUpperCase() as BroadcastAlert['priority'])
+                  : a.priority,
+                status: raw.status ?? a.status,
+              }
+        )
       );
+
       setSelectedBroadcast((prev) => {
         if (!prev || prev.id !== id) return prev;
         return {
           ...prev,
-          message:  raw.message ?? prev.message,
-          radius:   raw.radius ?? prev.radius,
+          message: raw.message ?? prev.message,
+          radius: raw.radius ?? prev.radius,
           priority: raw.priority
-            ? (raw.priority as string).toUpperCase() as BroadcastAlert['priority']
+            ? ((raw.priority as string).toUpperCase() as BroadcastAlert['priority'])
             : prev.priority,
           status: (raw.status ?? prev.status) as BroadcastAlert['status'],
         } satisfies BroadcastAlert;
@@ -210,17 +236,17 @@ const Dashboard: React.FC = () => {
     (id) => {
       setBroadcastAlerts((prev) => prev.filter((a) => a.id !== id));
       setSelectedBroadcast((prev) => (prev?.id === id ? null : prev));
-    },
+    }
   );
 
   useSafeZoneSocket({
     onCreated: (z) =>
       setSafeZones((prev) =>
-        prev.find((s) => s.safe_zone_id === z.safe_zone_id) ? prev : [...prev, z],
+        prev.find((s) => s.safe_zone_id === z.safe_zone_id) ? prev : [...prev, z]
       ),
     onUpdated: (z) =>
       setSafeZones((prev) =>
-        prev.map((s) => (s.safe_zone_id === z.safe_zone_id ? z : s)),
+        prev.map((s) => (s.safe_zone_id === z.safe_zone_id ? z : s))
       ),
     onDeleted: (id) =>
       setSafeZones((prev) => prev.filter((s) => s.safe_zone_id !== id)),
@@ -269,6 +295,7 @@ const Dashboard: React.FC = () => {
       setAlertCoordinates(coords);
       setIsPlacingAlert(false);
       setBroadcastLoading(true);
+
       try {
         const result = await fetchWithAuth('broadcast', {
           method: 'POST',
@@ -280,6 +307,7 @@ const Dashboard: React.FC = () => {
             priority: pendingBroadcast.priority.toLowerCase(),
           }),
         });
+
         setBroadcastAlerts((prev) => [
           ...prev,
           {
@@ -300,6 +328,7 @@ const Dashboard: React.FC = () => {
         setPendingBroadcast(null);
         setBroadcastLoading(false);
       }
+
       return;
     }
 
@@ -308,6 +337,7 @@ const Dashboard: React.FC = () => {
       setSafeZoneCoords(coords);
       setIsPlacingSafeZone(false);
       setSafeZoneLoading(true);
+
       try {
         await fetchWithAuth('safe-zones', {
           method: 'POST',
@@ -325,6 +355,7 @@ const Dashboard: React.FC = () => {
         setPendingSafeZone(null);
         setSafeZoneLoading(false);
       }
+
       return;
     }
   };
@@ -337,14 +368,23 @@ const Dashboard: React.FC = () => {
   };
 
   const handleRequestRouteFromPinned = async () => {
-    if (!destinationPin) { window.alert('Please select a destination first.'); return; }
-    if (!userLocation)   { window.alert('User location not available yet.'); return; }
+    if (!destinationPin) {
+      window.alert('Please select a destination first.');
+      return;
+    }
+
+    if (!userLocation) {
+      window.alert('User location not available yet.');
+      return;
+    }
+
     try {
       const result = await fetchWithAuth('api/routing/evacuation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ origin: userLocation, destination: destinationPin }),
       });
+
       setEvacRoute(result.route);
       setHasRoute(true);
       setRouteSafetyScore(result.safety_score);
@@ -365,10 +405,16 @@ const Dashboard: React.FC = () => {
   const safeFireReports: FireReport[] = (fires as FireReport[]).filter((fire) => {
     const lng = fire.coordinates?.[0];
     const lat = fire.coordinates?.[1];
+
     return (
-      typeof lng === 'number' && typeof lat === 'number' &&
-      !isNaN(lng) && !isNaN(lat) &&
-      lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+      typeof lng === 'number' &&
+      typeof lat === 'number' &&
+      !isNaN(lng) &&
+      !isNaN(lat) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
     );
   });
 
@@ -411,22 +457,34 @@ const Dashboard: React.FC = () => {
           hasActiveRoute={hasRoute}
           isSelectingDestination={isSelectingDestination}
           destinationPin={destinationPin}
-          onCycleBroadcastsRef={(fn) => { cycleBroadcastsFn.current = fn; }}
-          onCycleFiresRef={(fn) => { cycleFiresFn.current = fn; }}
-          onCycleSensorsRef={(fn) => { cycleSensorsFn.current = fn; }}
-          onGoToLocationRef={(fn) => { goToLocationFn.current = fn; }}
-          onFlyToRef={(fn) => { flyToFn.current = fn; }}
+          onCycleBroadcastsRef={(fn) => {
+            cycleBroadcastsFn.current = fn;
+          }}
+          onCycleFiresRef={(fn) => {
+            cycleFiresFn.current = fn;
+          }}
+          onCycleSensorsRef={(fn) => {
+            cycleSensorsFn.current = fn;
+          }}
+          onGoToLocationRef={(fn) => {
+            goToLocationFn.current = fn;
+          }}
+          onFlyToRef={(fn) => {
+            flyToFn.current = fn;
+          }}
           onDraftRadiusChange={(r) => {
             setDraftRadiusKm(r);
             setPendingBroadcast((prev) => (prev ? { ...prev, radius: r } : prev));
           }}
           onBroadcastDetail={(a) => setSelectedBroadcast(a)}
+          onIncidentClick={(inc) => setSelectedIncident(inc)}
           layerToggles={layerToggles}
           customOverlayFile={customOverlayFile}
         />
 
         <MapControls
           fires={safeFireReports}
+          incidentCount={Array.isArray(incidents) ? incidents.length : 0}
           isPlacingAlert={isPlacingAlert}
           broadcastAlerts={broadcastAlerts}
           safeZones={safeZones}
@@ -440,6 +498,7 @@ const Dashboard: React.FC = () => {
             setDraftRadiusKm(r);
             setPendingBroadcast((prev) => (prev ? { ...prev, radius: r } : prev));
           }}
+          onCycleIncidents={() => cycleIncidentsFn.current?.()}
           onCycleBroadcasts={() => cycleBroadcastsFn.current?.()}
           onCycleFires={() => cycleFiresFn.current?.()}
           onCycleSensors={() => cycleSensorsFn.current?.()}
@@ -458,6 +517,14 @@ const Dashboard: React.FC = () => {
           onSafeZoneCancelPlace={handleCancelSafeZone}
           onSafeZoneRadiusChange={setSafeZoneRadiusM}
         />
+
+        {selectedIncident && (
+          <IncidentDetailsPanel
+            incident={selectedIncident}
+            onClose={() => setSelectedIncident(null)}
+            onFlyTo={(lat, lng) => flyToFn.current(lat, lng)}
+          />
+        )}
       </div>
     </div>
   );
