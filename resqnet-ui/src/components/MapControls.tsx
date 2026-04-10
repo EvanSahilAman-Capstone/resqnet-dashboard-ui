@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Flame, Radio, Compass, List, Plus, ChevronRight,
+  Radio, Compass, List, Plus, ChevronRight,
   Settings, ShieldCheck, FileText, MapPin, ShieldAlert,
 } from "lucide-react";
 import DraggableWindow from "./DraggableWindow";
@@ -99,6 +99,7 @@ const MapControls: React.FC<MapControlsProps> = ({
 
   const [internalSelected, setInternalSelected] = useState<BroadcastAlert | null>(null);
   const detailAlert = selectedBroadcast ?? internalSelected;
+
   const handleDetailClose = () => {
     setInternalSelected(null);
     onDetailClose?.();
@@ -499,10 +500,6 @@ const MapControls: React.FC<MapControlsProps> = ({
           defaultSize={{ w: 260, h: 420 }}
         >
           <LegendPanel
-            incidentCount={incidentCount}
-            broadcastCount={broadcastAlerts.length}
-            fireCount={fires.length}
-            sensorCount={sensorCount}
             onCycleIncidents={onCycleIncidents}
             onCycleBroadcasts={onCycleBroadcasts}
             onCycleFires={onCycleFires}
