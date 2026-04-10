@@ -1,3 +1,5 @@
+// Context provider for panels on dashboard view - keeps panels consistent in frontend
+
 import React, { createContext, useContext, useState, useCallback } from "react";
 
 type Panel = "broadcast" | "legend" | "layers" | "safezones" | "reports";
