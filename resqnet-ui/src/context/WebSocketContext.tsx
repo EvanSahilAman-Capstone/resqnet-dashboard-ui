@@ -1,3 +1,5 @@
+// Context provider for real-time websocket connection in frontend - handles Auth0, defines events, manages roles 
+
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 
