@@ -1,8 +1,8 @@
 import React from 'react';
 import { Marker } from 'react-map-gl/mapbox';
-import { UserRound } from 'lucide-react';
+import { UserRound, ShieldCheck } from 'lucide-react';
 import { INCIDENT_STATUS_OPACITY } from './constants';
-import type { WildfireEvent, BroadcastAlert, Sensor, PopupInfo } from './types';
+import type { WildfireEvent, BroadcastAlert, Sensor, PopupInfo, SafeZone } from './types';
 import type { FireReport, Incident } from '../../hooks/useLocalData';
 
 interface MarkersProps {
@@ -11,12 +11,14 @@ interface MarkersProps {
   incidents?:         Incident[];
   sensors:            Sensor[];
   broadcastAlerts:    BroadcastAlert[];
+  safeZones?:         SafeZone[];
   userLocation:       [number, number] | null;
   destinationPin:     [number, number] | null;
   onPopup:            (info: PopupInfo | null) => void;
   onBroadcastDetail:  (alert: BroadcastAlert) => void;
   onFireReportClick?: (report: FireReport) => void;
   onIncidentClick?:   (incident: Incident) => void;
+  onSafeZoneClick?:   (zone: SafeZone) => void;
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -32,6 +34,8 @@ const BCAST_COLOR: Record<string, string> = {
   HIGH:   '#ef4444',
   URGENT: '#991b1b',
 };
+
+const SAFE_ZONE_GREEN = '#16a34a';
 
 function safeMarker(
   id: string,
@@ -101,16 +105,22 @@ const CpuIcon   = (c: string, s: number) => Svg(<><rect width="16" height="16" x
 const NavIcon   = (c: string, s: number) => Svg(<path d="M3 11l19-9-9 19-2-8-8-2z" />, c, s, { transform: 'rotate(-90deg)' });
 const PinIcon   = (c: string, s: number) => Svg(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>, c, s);
 
+const SAFE_ZONE_CATEGORY_LABEL: Record<string, string> = {
+  shelter:          'Shelter',
+  medical:          'Medical',
+  evacuation_point: 'Evacuation Point',
+  command_post:     'Command Post',
+  other:            'Safe Zone',
+};
+
 const MapMarkers: React.FC<MarkersProps> = ({
   fires, fireReports = [], incidents = [], sensors, broadcastAlerts,
-  userLocation, destinationPin, onPopup, onBroadcastDetail,
-  onFireReportClick, onIncidentClick,
+  safeZones = [], userLocation, destinationPin, onPopup, onBroadcastDetail,
+  onFireReportClick, onIncidentClick, onSafeZoneClick,
 }) => {
-  console.log(`[MapMarkers] fires=${fires.length} fireReports=${fireReports.length} incidents=${incidents.length} sensors=${sensors.length} broadcasts=${broadcastAlerts.length}`);
-
   return (
     <>
-      {/* user location — stored as [lng, lat] */}
+      {/* ── User location — stored as [lng, lat] ─────────────────────────── */}
       {userLocation && (() => {
         const c = safeMarker('user', userLocation[0], userLocation[1], 'userLocation');
         if (!c.valid) return null;
@@ -125,7 +135,7 @@ const MapMarkers: React.FC<MarkersProps> = ({
         );
       })()}
 
-      {/* destination pin — stored as [lat, lng] */}
+      {/* ── Destination pin — stored as [lat, lng] ───────────────────────── */}
       {destinationPin && (() => {
         const c = safeMarker('dest', destinationPin[1], destinationPin[0], 'destinationPin');
         if (!c.valid) return null;
@@ -140,7 +150,34 @@ const MapMarkers: React.FC<MarkersProps> = ({
         );
       })()}
 
-      {/* incidents — coordinates [lng, lat] */}
+      {/* ── Safe zones — always green, always shown ──────────────────────── */}
+      {safeZones.map((zone) => {
+        const c = safeMarker(zone.safe_zone_id, zone.coordinates[0], zone.coordinates[1], 'safeZone');
+        if (!c.valid) return null;
+        const categoryLabel = SAFE_ZONE_CATEGORY_LABEL[zone.category] ?? 'Safe Zone';
+        return (
+          <Marker key={`sz-${zone.safe_zone_id}`} longitude={c.lng} latitude={c.lat} anchor="center">
+            <BarePin
+              onClick={() => onSafeZoneClick?.(zone)}
+              onMouseEnter={() => onPopup({
+                longitude: c.lng,
+                latitude:  c.lat,
+                title:     zone.name,
+                details:   `${categoryLabel} · ${zone.status.replace('_', ' ')} · ${zone.radius_m}m radius`,
+              })}
+              onMouseLeave={() => onPopup(null)}>
+              <ShieldCheck
+                size={26}
+                color={SAFE_ZONE_GREEN}
+                strokeWidth={2}
+                style={{ display: 'block', pointerEvents: 'none', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))' }}
+              />
+            </BarePin>
+          </Marker>
+        );
+      })}
+
+      {/* ── Incidents — coordinates [lng, lat] ───────────────────────────── */}
       {incidents.map((inc) => {
         const c = safeMarker(inc.incident_id, inc.coordinates?.[0], inc.coordinates?.[1], 'incident');
         if (!c.valid || inc.status === 'cancelled') return null;
@@ -161,12 +198,11 @@ const MapMarkers: React.FC<MarkersProps> = ({
         );
       })}
 
-      {/* fire reports — coordinates [lng, lat] */}
+      {/* ── Fire reports — coordinates [lng, lat] ────────────────────────── */}
       {fireReports.map((report) => {
         const c = safeMarker(report.report_id, report.coordinates?.[0], report.coordinates?.[1], 'fireReport');
         if (!c.valid || (report.status && report.status !== 'pending_review')) return null;
         const color = SEV_COLOR[report.severity] ?? '#f97316';
-        console.log(`[MapMarkers] fireReport ${report.report_id} lng=${c.lng} lat=${c.lat}`);
         return (
           <Marker key={`fr-${report.report_id}`} longitude={c.lng} latitude={c.lat} anchor="center">
             <CirclePin color={color} size={36}
@@ -179,7 +215,7 @@ const MapMarkers: React.FC<MarkersProps> = ({
         );
       })}
 
-      {/* wildfire feed — explicit latitude/longitude fields */}
+      {/* ── Wildfire feed — explicit latitude/longitude fields ────────────── */}
       {fires.map((fire) => {
         const c = safeMarker(fire.id, fire.longitude, fire.latitude, 'wildfire');
         if (!c.valid) return null;
@@ -198,7 +234,7 @@ const MapMarkers: React.FC<MarkersProps> = ({
         );
       })}
 
-      {/* sensors — explicit latitude/longitude fields */}
+      {/* ── Sensors — explicit latitude/longitude fields ──────────────────── */}
       {sensors.map((sensor) => {
         const c = safeMarker(sensor.id, sensor.longitude, sensor.latitude, 'sensor');
         if (!c.valid) return null;
@@ -216,7 +252,7 @@ const MapMarkers: React.FC<MarkersProps> = ({
         );
       })}
 
-      {/* broadcasts — position [lat, lng] */}
+      {/* ── Broadcasts — position [lat, lng] ─────────────────────────────── */}
       {broadcastAlerts.map((alert) => {
         const c = safeMarker(alert.id, alert.position[1], alert.position[0], 'broadcast');
         if (!c.valid) return null;

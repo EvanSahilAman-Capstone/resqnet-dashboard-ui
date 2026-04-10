@@ -53,18 +53,22 @@ const apply3DTerrain = (map: MapboxMap, enable: boolean) => {
 
 const MapCore: React.FC<MapProps> = ({
   fires,
+  safeZones               = [],
   evacuationRoute,
   evacuationSafetyScore,
-  broadcastAlerts = [],
-  sensors         = [],
-  fireReports     = [],
+  broadcastAlerts         = [],
+  sensors                 = [],
+  fireReports             = [],
   onFireReportClick,
   onIncidentClick,
+  onSafeZoneClick,
   onMapClick,
   isPlacingAlert          = false,
   isBroadcastPanelOpen    = false,
   draftRadiusKm           = 1,
   draftPriority           = 'LOW',
+  isPlacingSafeZone       = false,
+  safeZoneRadiusM         = 500,
   onStartDestinationSelection,
   onSelectDestinationOnMap,
   onRequestRouteFromPinned,
@@ -84,17 +88,22 @@ const MapCore: React.FC<MapProps> = ({
   const mapRef     = useRef<MapRef | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const isPlacingRef      = useRef(isPlacingAlert);
-  const isBroadcastRef    = useRef(isBroadcastPanelOpen);
-  const pendingRef        = useRef(false);
-  const internalRadiusRef = useRef(draftRadiusKm);
-  const mapLoadedRef      = useRef(false);
+  // ── Refs for event handlers (stale-closure safe) ──────────────────────────
+  const isPlacingRef          = useRef(isPlacingAlert);
+  const isBroadcastRef        = useRef(isBroadcastPanelOpen);
+  const isSafeZoneRef         = useRef(isPlacingSafeZone);
+  const pendingRef            = useRef(false);
+  const internalRadiusRef     = useRef(draftRadiusKm);
+  const internalSZRadiusRef   = useRef(safeZoneRadiusM);
+  const mapLoadedRef          = useRef(false);
 
+  // ── State ─────────────────────────────────────────────────────────────────
   const [viewState, setViewState]                     = useState({ longitude: -79.5, latitude: 44.5, zoom: 10 });
   const [userLocation, setUserLocation]               = useState<[number, number] | null>(null);
   const [initialUserLocation, setInitialUserLocation] = useState<[number, number] | null>(null);
   const [popupInfo, setPopupInfo]                     = useState<PopupInfo | null>(null);
   const [mousePosition, setMousePosition]             = useState<[number, number] | null>(null);
+  const [safeZoneMousePos, setSafeZoneMousePos]       = useState<[number, number] | null>(null);
   const [pendingPlacement, setPendingPlacement]       = useState<{
     lngLat: [number, number];
     screen: { x: number; y: number };
@@ -106,6 +115,7 @@ const MapCore: React.FC<MapProps> = ({
   const [activeStyleId, setActiveStyleId]     = useState('streets');
   const [showStylePicker, setShowStylePicker] = useState(false);
   const [internalRadius, setInternalRadius]   = useState(draftRadiusKm);
+  const [internalSZRadius, setInternalSZRadius] = useState(safeZoneRadiusM);
   const [mapLoaded, setMapLoaded]             = useState(false);
 
   // ── Incidents via hook ────────────────────────────────────────────────────
@@ -135,37 +145,78 @@ const MapCore: React.FC<MapProps> = ({
       setShowCounties(layerToggles.countyBoundaries);
   }, [layerToggles?.countyBoundaries, setShowCounties]);
 
-  useEffect(() => { isPlacingRef.current   = isPlacingAlert; },       [isPlacingAlert]);
-  useEffect(() => { isBroadcastRef.current = isBroadcastPanelOpen; }, [isBroadcastPanelOpen]);
+  // ── Sync refs ─────────────────────────────────────────────────────────────
+  useEffect(() => { isPlacingRef.current    = isPlacingAlert;     }, [isPlacingAlert]);
+  useEffect(() => { isBroadcastRef.current  = isBroadcastPanelOpen; }, [isBroadcastPanelOpen]);
+  useEffect(() => { isSafeZoneRef.current   = isPlacingSafeZone;  }, [isPlacingSafeZone]);
+
   useEffect(() => {
     internalRadiusRef.current = draftRadiusKm;
     setInternalRadius(draftRadiusKm);
   }, [draftRadiusKm]);
 
   useEffect(() => {
-    if (!isPlacingAlert) { setPendingPlacement(null); pendingRef.current = false; }
-    if (!isPlacingAlert && !isBroadcastPanelOpen) setMousePosition(null);
-  }, [isPlacingAlert, isBroadcastPanelOpen]);
+    internalSZRadiusRef.current = safeZoneRadiusM;
+    setInternalSZRadius(safeZoneRadiusM);
+  }, [safeZoneRadiusM]);
 
-  // ── Native click / mousemove ──────────────────────────────────────────────
+  // ── Clear state when placing modes exit ───────────────────────────────────
+  useEffect(() => {
+    if (!isPlacingAlert && !isPlacingSafeZone) {
+      setPendingPlacement(null);
+      pendingRef.current = false;
+      setMousePosition(null);
+      setSafeZoneMousePos(null);
+    }
+    if (!isPlacingAlert && !isBroadcastPanelOpen) {
+      setMousePosition(null);
+    }
+  }, [isPlacingAlert, isPlacingSafeZone, isBroadcastPanelOpen]);
+
+  // ── Native click ──────────────────────────────────────────────────────────
+  // Handles both broadcast and safe zone placement clicks
   const handleNativeClick = useCallback((e: MapMouseEvent) => {
-    if (!isPlacingRef.current) return;
+    const placingBroadcast = isPlacingRef.current;
+    const placingSafeZone  = isSafeZoneRef.current;
+    if (!placingBroadcast && !placingSafeZone) return;
+
     const map = mapRef.current?.getMap() as MapboxMap | undefined;
     if (!map) return;
+
     const { lng, lat } = e.lngLat;
     const center      = map.project([lng, lat]);
     const metersPerPx = 156543.03392 * Math.cos((lat * Math.PI) / 180) / Math.pow(2, map.getZoom());
-    const radiusPx    = (internalRadiusRef.current * 1000) / metersPerPx;
-    const rect        = wrapperRef.current?.getBoundingClientRect();
-    const screenX     = (rect?.left ?? 0) + center.x + radiusPx * 0.707;
-    const screenY     = (rect?.top  ?? 0) + center.y - radiusPx * 0.707;
+
+    // Use the correct radius depending on which mode is active
+    const radiusM  = placingSafeZone
+      ? internalSZRadiusRef.current
+      : internalRadiusRef.current * 1000;
+    const radiusPx = radiusM / metersPerPx;
+
+    const rect    = wrapperRef.current?.getBoundingClientRect();
+    const screenX = (rect?.left ?? 0) + center.x + radiusPx * 0.707;
+    const screenY = (rect?.top  ?? 0) + center.y - radiusPx * 0.707;
+
     pendingRef.current = true;
     setPendingPlacement({ lngLat: [lng, lat], screen: { x: screenX, y: screenY } });
   }, []);
 
+  // ── Native mousemove ──────────────────────────────────────────────────────
   const handleNativeMouseMove = useCallback((e: MapMouseEvent) => {
-    if ((!isPlacingRef.current && !isBroadcastRef.current) || pendingRef.current) return;
-    setMousePosition([e.lngLat.lng, e.lngLat.lat]);
+    if (pendingRef.current) return;
+    const placingBroadcast = isPlacingRef.current || isBroadcastRef.current;
+    const placingSafeZone  = isSafeZoneRef.current;
+    if (!placingBroadcast && !placingSafeZone) return;
+
+    const pos: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+
+    if (placingBroadcast) {
+      setMousePosition(pos);
+      setSafeZoneMousePos(null);
+    } else {
+      setSafeZoneMousePos(pos);
+      setMousePosition(null);
+    }
   }, []);
 
   const bindMapListeners = useCallback(() => {
@@ -198,14 +249,19 @@ const MapCore: React.FC<MapProps> = ({
     return () => { map.off('style.load', onStyleLoad); };
   }, [activeStyleId, bindMapListeners, rehydratePop, rehydrateTraffic, rehydrateCounties]);
 
+  // ── Cursor style ──────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current?.getMap() as MapboxMap | undefined;
     if (!map || !mapLoadedRef.current) return;
-    if (isPlacingAlert && !pendingPlacement)  map.getCanvas().style.cursor = 'crosshair';
-    else if (isSelectingDestination)          map.getCanvas().style.cursor = 'pointer';
-    else                                      map.getCanvas().style.cursor = '';
-  }, [isPlacingAlert, pendingPlacement, isSelectingDestination]);
+    if ((isPlacingAlert || isPlacingSafeZone) && !pendingPlacement)
+      map.getCanvas().style.cursor = 'crosshair';
+    else if (isSelectingDestination)
+      map.getCanvas().style.cursor = 'pointer';
+    else
+      map.getCanvas().style.cursor = '';
+  }, [isPlacingAlert, isPlacingSafeZone, pendingPlacement, isSelectingDestination]);
 
+  // ── Geolocation ───────────────────────────────────────────────────────────
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -223,6 +279,7 @@ const MapCore: React.FC<MapProps> = ({
     if (loc) flyTo(loc[0], loc[1], 12);
   }, [userLocation, initialUserLocation, flyTo]);
 
+  // ── Imperative cycle refs ─────────────────────────────────────────────────
   useEffect(() => {
     onCycleBroadcastsRef?.(() => {
       if (!broadcastAlerts.length) return;
@@ -231,9 +288,19 @@ const MapCore: React.FC<MapProps> = ({
       setBroadcastIndex((p) => p + 1);
     });
     onCycleFiresRef?.(() => {
-      if (!fires.length) return;
-      const idx = fireIndex % fires.length;
-      flyTo(fires[idx]!.longitude, fires[idx]!.latitude);
+      if (!fireReports.length) return;
+      const idx  = fireIndex % fireReports.length;
+      const fire = fireReports[idx]!;
+      const lng  = fire.coordinates?.[0];
+      const lat  = fire.coordinates?.[1];
+      if (
+        typeof lng !== 'number' || typeof lat !== 'number' ||
+        isNaN(lng) || isNaN(lat)
+      ) {
+        setFireIndex((p) => p + 1);
+        return;
+      }
+      flyTo(lng, lat);
       setFireIndex((p) => p + 1);
     });
     onCycleSensorsRef?.(() => {
@@ -245,12 +312,18 @@ const MapCore: React.FC<MapProps> = ({
     onGoToLocationRef?.(goToUserLocation);
     onFlyToRef?.((lat, lng) => flyTo(lng, lat));
   }, [
-    broadcastAlerts, fires, sensors,
+    broadcastAlerts, fireReports, sensors,
     broadcastIndex, fireIndex, sensorIndex,
     goToUserLocation, flyTo,
     onCycleBroadcastsRef, onCycleFiresRef, onCycleSensorsRef,
     onGoToLocationRef, onFlyToRef,
   ]);
+
+  // ── Derived: which mouse pos / radius to show for diameter HUD ───────────
+  const isAnyPlacing   = isPlacingAlert || isPlacingSafeZone;
+  const hudDiameterKm  = isPlacingSafeZone
+    ? (internalSZRadius / 1000) * 2
+    : internalRadius * 2;
 
   return (
     <div ref={wrapperRef} className="w-full h-full rounded-xl shadow-inner relative">
@@ -273,12 +346,14 @@ const MapCore: React.FC<MapProps> = ({
           incidents={incidents}
           sensors={sensors}
           broadcastAlerts={broadcastAlerts}
+          safeZones={safeZones}
           userLocation={userLocation}
           destinationPin={destinationPin}
           onPopup={setPopupInfo}
           onBroadcastDetail={onBroadcastDetail ?? (() => {})}
           onFireReportClick={onFireReportClick}
           onIncidentClick={onIncidentClick}
+          onSafeZoneClick={onSafeZoneClick}
         />
 
         <MapLayers
@@ -291,6 +366,10 @@ const MapCore: React.FC<MapProps> = ({
           showDraftCircle={isBroadcastPanelOpen || isPlacingAlert}
           sensors={sensors}
           fires={fires}
+          safeZones={safeZones}
+          showDraftSafeZone={isPlacingSafeZone && !pendingPlacement}
+          safeZoneMousePos={safeZoneMousePos}
+          safeZoneRadiusM={internalSZRadius}
           layerToggles={layerToggles}
           customOverlayFile={customOverlayFile}
         />
@@ -309,14 +388,19 @@ const MapCore: React.FC<MapProps> = ({
         onCancelRoute={onCancelRoute}
       />
 
-      {(isBroadcastPanelOpen || isPlacingAlert) && !pendingPlacement && (
+      {/* ── Diameter HUD (broadcast or safe zone) ─────────────────────────── */}
+      {isAnyPlacing && !pendingPlacement && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
           <div className="bg-black/70 text-white text-xs font-mono px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap">
-            ⌀ {(internalRadius * 2).toFixed(1)} km diameter
+            {isPlacingSafeZone
+              ? `⌀ ${hudDiameterKm.toFixed(2)} km diameter`
+              : `⌀ ${hudDiameterKm.toFixed(1)} km diameter`
+            }
           </div>
         </div>
       )}
 
+      {/* ── Confirm / cancel placement ────────────────────────────────────── */}
       {pendingPlacement && (
         <div
           className="fixed z-[9999] flex gap-2"
@@ -324,7 +408,12 @@ const MapCore: React.FC<MapProps> = ({
         >
           <button
             type="button"
-            onClick={() => { setPendingPlacement(null); pendingRef.current = false; setMousePosition(null); }}
+            onClick={() => {
+              setPendingPlacement(null);
+              pendingRef.current = false;
+              setMousePosition(null);
+              setSafeZoneMousePos(null);
+            }}
             className="w-10 h-10 rounded-full bg-white border-2 border-gray-900 text-gray-900 flex items-center justify-center hover:bg-gray-100 transition-colors shadow-xl"
             title="Cancel"
           >
@@ -334,7 +423,10 @@ const MapCore: React.FC<MapProps> = ({
             type="button"
             onClick={() => {
               onMapClick?.(pendingPlacement.lngLat[1], pendingPlacement.lngLat[0]);
-              setPendingPlacement(null); pendingRef.current = false; setMousePosition(null);
+              setPendingPlacement(null);
+              pendingRef.current = false;
+              setMousePosition(null);
+              setSafeZoneMousePos(null);
             }}
             className="w-10 h-10 rounded-full bg-gray-900 border-2 border-gray-900 text-white flex items-center justify-center hover:bg-gray-700 transition-colors shadow-xl"
             title="Confirm"
@@ -344,6 +436,7 @@ const MapCore: React.FC<MapProps> = ({
         </div>
       )}
 
+      {/* ── Map controls (style picker + location) ────────────────────────── */}
       <div className="absolute bottom-4 right-4 z-50 flex flex-col items-center gap-2">
         <MapStylePicker
           activeStyleId={activeStyleId}

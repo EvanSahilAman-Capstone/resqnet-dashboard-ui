@@ -6,7 +6,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Users } from 'lucide-react';
 import { useAuth0 } from '@auth0/auth0-react';
-import Logo from '../assets/logo.jpg';
+import Logo from '../assets/logo.png';
 
 type SidebarProps = {
   onLogoutClick?: () => void;
@@ -25,7 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogoutClick }) => {
         <div className="inline-flex size-16 items-center justify-center">
           <img
             src={Logo}
-            className="size-11 place-content-center rounded-2xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold text-lg shadow-lg border-2 border-white/50"
+            className="size-12"
           />
         </div>
       </div>

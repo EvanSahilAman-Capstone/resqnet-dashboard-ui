@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 
-type Panel = "broadcast" | "legend" | "layers";
+type Panel = "broadcast" | "legend" | "layers" | "safezones" | "reports";
 type BroadcastSubPanel = "list" | "create" | null;
 
 export interface LayerToggles {
@@ -22,18 +22,20 @@ interface WindowState {
 }
 
 interface PanelContextType {
-  openPanels:        Set<Panel>;
-  togglePanel:       (panel: Panel) => void;
-  closePanel:        (panel: Panel) => void;
-  broadcastSub:      BroadcastSubPanel;
-  setBroadcastSub:   (sub: BroadcastSubPanel) => void;
-  incidentsOpen:     boolean;
-  setIncidentsOpen:  (open: boolean) => void;
-  windowStates:      Record<string, WindowState>;
-  setWindowPinned:   (id: string, pinned: boolean) => void;
-  setWindowPosition: (id: string, position: { x: number; y: number }) => void;
-  setWindowSize:     (id: string, size: { w: number; h: number }) => void;
-  getWindowState:    (id: string, defaultPos: { x: number; y: number }, defaultSize?: { w: number; h: number }) => WindowState;
+  openPanels:           Set<Panel>;
+  togglePanel:          (panel: Panel) => void;
+  closePanel:           (panel: Panel) => void;
+  broadcastSub:         BroadcastSubPanel;
+  setBroadcastSub:      (sub: BroadcastSubPanel) => void;
+  incidentsOpen:        boolean;
+  setIncidentsOpen:     (open: boolean) => void;
+  safeZonesOpen:        boolean;                          // ← ADDED
+  setSafeZonesOpen:     (open: boolean) => void;          // ← ADDED
+  windowStates:         Record<string, WindowState>;
+  setWindowPinned:      (id: string, pinned: boolean) => void;
+  setWindowPosition:    (id: string, position: { x: number; y: number }) => void;
+  setWindowSize:        (id: string, size: { w: number; h: number }) => void;
+  getWindowState:       (id: string, defaultPos: { x: number; y: number }, defaultSize?: { w: number; h: number }) => WindowState;
   layerToggles:         LayerToggles;
   setLayerToggle:       (key: keyof LayerToggles, value: boolean) => void;
   customOverlayFile:    File | null;
@@ -43,6 +45,8 @@ interface PanelContextType {
 const DEFAULT_POSITIONS: Record<string, { x: number; y: number }> = {
   broadcast_list:   { x: 500, y: 70 },
   broadcast_create: { x: 500, y: 70 },
+  safezones_list:   { x: 500, y: 70 },
+  safezones_create: { x: 500, y: 70 },
   legend:           { x: 900, y: 70 },
   layers:           { x: 1100, y: 70 },
 };
@@ -50,6 +54,8 @@ const DEFAULT_POSITIONS: Record<string, { x: number; y: number }> = {
 const DEFAULT_SIZES: Record<string, { w: number; h: number }> = {
   broadcast_list:   { w: 320, h: 480 },
   broadcast_create: { w: 320, h: 480 },
+  safezones_list:   { w: 320, h: 480 },
+  safezones_create: { w: 300, h: 480 },
   legend:           { w: 256, h: 480 },
   layers:           { w: 260, h: 480 },
 };
@@ -69,11 +75,12 @@ const DEFAULT_LAYER_TOGGLES: LayerToggles = {
 const PanelContext = createContext<PanelContextType | null>(null);
 
 export const PanelProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [openPanels, setOpenPanels]       = useState<Set<Panel>>(new Set());
-  const [broadcastSub, setBroadcastSub]   = useState<BroadcastSubPanel>(null);
-  const [incidentsOpen, setIncidentsOpen] = useState(false);
-  const [windowStates, setWindowStates]   = useState<Record<string, WindowState>>({});
-  const [layerToggles, setLayerToggles]   = useState<LayerToggles>(DEFAULT_LAYER_TOGGLES);
+  const [openPanels, setOpenPanels]         = useState<Set<Panel>>(new Set());
+  const [broadcastSub, setBroadcastSub]     = useState<BroadcastSubPanel>(null);
+  const [incidentsOpen, setIncidentsOpen]   = useState(false);
+  const [safeZonesOpen, setSafeZonesOpen]   = useState(false);   // ← ADDED
+  const [windowStates, setWindowStates]     = useState<Record<string, WindowState>>({});
+  const [layerToggles, setLayerToggles]     = useState<LayerToggles>(DEFAULT_LAYER_TOGGLES);
   const [customOverlayFile, setCustomOverlayFile] = useState<File | null>(null);
 
   const togglePanel = (panel: Panel) => {
@@ -144,7 +151,7 @@ export const PanelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         size:     DEFAULT_SIZES[id] ?? defaultSize,
       };
     },
-    [windowStates]
+    [windowStates],
   );
 
   return (
@@ -152,6 +159,7 @@ export const PanelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       openPanels, togglePanel, closePanel,
       broadcastSub, setBroadcastSub,
       incidentsOpen, setIncidentsOpen,
+      safeZonesOpen, setSafeZonesOpen,           // ← ADDED
       windowStates, setWindowPinned, setWindowPosition, setWindowSize, getWindowState,
       layerToggles, setLayerToggle,
       customOverlayFile, setCustomOverlayFile,

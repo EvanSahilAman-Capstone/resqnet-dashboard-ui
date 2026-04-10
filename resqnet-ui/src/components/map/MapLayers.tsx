@@ -2,25 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { Source, Layer } from 'react-map-gl/mapbox';
 import circle from '@turf/circle';
 import type { Feature, FeatureCollection, LineString, Polygon, Point } from 'geojson';
-import type { BroadcastAlert, Sensor, WildfireEvent } from './types';
+import type { BroadcastAlert, Sensor, WildfireEvent, SafeZone } from './types';
 import type { LayerToggles } from '../../context/PanelContext';
 import { PRIORITY_COLORS, SEVERITY_COLORS, getRouteColor } from './constants';
 
 interface MapLayersProps {
-  broadcastAlerts:       BroadcastAlert[];
-  evacuationRoute:       [number, number][];
+  broadcastAlerts:        BroadcastAlert[];
+  evacuationRoute:        [number, number][];
   evacuationSafetyScore?: number;
-  mousePosition:         [number, number] | null;
-  draftRadiusKm:         number;
-  draftPriority:         'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  showDraftCircle?:      boolean;
-  sensors?:              Sensor[];
-  fires?:                WildfireEvent[];
-  layerToggles?:         LayerToggles;
-  customOverlayFile?:    File | null;
+  mousePosition:          [number, number] | null;
+  draftRadiusKm:          number;
+  draftPriority:          'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  showDraftCircle?:       boolean;
+  sensors?:               Sensor[];
+  fires?:                 WildfireEvent[];
+  safeZones?:             SafeZone[];
+  // Safe zone draft props
+  showDraftSafeZone?:     boolean;
+  safeZoneMousePos?:      [number, number] | null;
+  safeZoneRadiusM?:       number;
+  layerToggles?:          LayerToggles;
+  customOverlayFile?:     File | null;
 }
 
 const SENSOR_RADIUS_KM = 5;
+const SAFE_ZONE_GREEN  = '#16a34a';
 
 interface RainViewerFrame { time: number; path: string; }
 interface RainViewerAPI {
@@ -36,9 +42,13 @@ const MapLayers: React.FC<MapLayersProps> = ({
   mousePosition,
   draftRadiusKm,
   draftPriority,
-  showDraftCircle = false,
-  sensors = [],
-  fires = [],
+  showDraftCircle   = false,
+  sensors           = [],
+  fires             = [],
+  safeZones         = [],
+  showDraftSafeZone = false,
+  safeZoneMousePos  = null,
+  safeZoneRadiusM   = 500,
   layerToggles,
   customOverlayFile,
 }) => {
@@ -81,16 +91,16 @@ const MapLayers: React.FC<MapLayersProps> = ({
     reader.readAsText(customOverlayFile);
   }, [customOverlayFile]);
 
-  // ── GeoJSON collections ───────────────────────────────────────────────────
+  // ── Broadcast circles ─────────────────────────────────────────────────────
   const alertCircles: Feature[] = broadcastAlerts.map((alert) =>
     circle([alert.position[1], alert.position[0]], Math.max(0.01, alert.radius), {
       steps: 64, units: 'kilometers',
       properties: { id: alert.id, priority: alert.priority, color: PRIORITY_COLORS[alert.priority] },
     }) as Feature
   );
-
   const alertsCollection: FeatureCollection = { type: 'FeatureCollection', features: alertCircles };
 
+  // ── Broadcast draft circle ────────────────────────────────────────────────
   const draftFeature: Feature<Polygon> | null =
     showDraftCircle && mousePosition
       ? circle(mousePosition, Math.max(0.01, draftRadiusKm), {
@@ -99,6 +109,40 @@ const MapLayers: React.FC<MapLayersProps> = ({
         }) as Feature<Polygon>
       : null;
 
+  // ── Safe zone permanent circles (always green) ────────────────────────────
+  const safeZoneCircles: Feature[] = safeZones
+    .filter((z) => {
+      const lng = z.coordinates[0];
+      const lat = z.coordinates[1];
+      return (
+        typeof lng === 'number' && typeof lat === 'number' &&
+        !isNaN(lng) && !isNaN(lat) &&
+        lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 &&
+        z.radius_m > 0
+      );
+    })
+    .map((z) =>
+      circle(
+        [z.coordinates[0], z.coordinates[1]],
+        Math.max(0.01, z.radius_m / 1000),
+        { steps: 64, units: 'kilometers', properties: { id: z.safe_zone_id } },
+      ) as Feature
+    );
+  const safeZonesCollection: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: safeZoneCircles,
+  };
+
+  // ── Safe zone draft circle ────────────────────────────────────────────────
+  const safeZoneDraftFeature: Feature<Polygon> | null =
+    showDraftSafeZone && safeZoneMousePos
+      ? circle(safeZoneMousePos, Math.max(0.01, safeZoneRadiusM / 1000), {
+          steps: 64, units: 'kilometers',
+          properties: { color: SAFE_ZONE_GREEN },
+        }) as Feature<Polygon>
+      : null;
+
+  // ── Other collections ─────────────────────────────────────────────────────
   const routeGeoJSON: Feature<LineString> | null =
     evacuationRoute.length > 0
       ? { type: 'Feature', properties: { safetyScore: evacuationSafetyScore ?? null },
@@ -152,7 +196,7 @@ const MapLayers: React.FC<MapLayersProps> = ({
 
   return (
     <>
-      {/* Broadcast circles */}
+      {/* ── Broadcast circles ───────────────────────────────────────────── */}
       {alertCircles.length > 0 && (
         <Source id="alert-circles" type="geojson" data={alertsCollection}>
           <Layer id="alert-circles-fill" type="fill"
@@ -162,7 +206,7 @@ const MapLayers: React.FC<MapLayersProps> = ({
         </Source>
       )}
 
-      {/* Draft circle */}
+      {/* ── Broadcast draft circle ──────────────────────────────────────── */}
       {draftFeature && (
         <Source id="draft-alert-circle" type="geojson"
           data={{ type: 'FeatureCollection', features: [draftFeature] }}>
@@ -173,7 +217,28 @@ const MapLayers: React.FC<MapLayersProps> = ({
         </Source>
       )}
 
-      {/* Evacuation route */}
+      {/* ── Safe zone permanent circles ─────────────────────────────────── */}
+      {safeZoneCircles.length > 0 && (
+        <Source id="safe-zone-circles" type="geojson" data={safeZonesCollection}>
+          <Layer id="safe-zone-circles-fill" type="fill"
+            paint={{ 'fill-color': SAFE_ZONE_GREEN, 'fill-opacity': 0.12 }} />
+          <Layer id="safe-zone-circles-outline" type="line"
+            paint={{ 'line-color': SAFE_ZONE_GREEN, 'line-width': 2 }} />
+        </Source>
+      )}
+
+      {/* ── Safe zone draft circle ──────────────────────────────────────── */}
+      {safeZoneDraftFeature && (
+        <Source id="draft-safe-zone-circle" type="geojson"
+          data={{ type: 'FeatureCollection', features: [safeZoneDraftFeature] }}>
+          <Layer id="draft-safe-zone-circle-fill" type="fill"
+            paint={{ 'fill-color': SAFE_ZONE_GREEN, 'fill-opacity': 0.15 }} />
+          <Layer id="draft-safe-zone-circle-outline" type="line"
+            paint={{ 'line-color': SAFE_ZONE_GREEN, 'line-width': 2, 'line-dasharray': [3, 2] }} />
+        </Source>
+      )}
+
+      {/* ── Evacuation route ────────────────────────────────────────────── */}
       {routeGeoJSON && (
         <Source type="geojson" data={routeGeoJSON}>
           <Layer id="route" type="line"
@@ -183,7 +248,7 @@ const MapLayers: React.FC<MapLayersProps> = ({
         </Source>
       )}
 
-      {/* Sensor coverage */}
+      {/* ── Sensor coverage ─────────────────────────────────────────────── */}
       {t?.sensorCoverage && sensors.length > 0 && (
         <Source id="sensor-coverage" type="geojson" data={sensorCoverageCollection}>
           <Layer id="sensor-coverage-fill" type="fill"
@@ -193,7 +258,7 @@ const MapLayers: React.FC<MapLayersProps> = ({
         </Source>
       )}
 
-      {/* Fire heatmap */}
+      {/* ── Fire heatmap ────────────────────────────────────────────────── */}
       {t?.fireHeatmap && fires.length > 0 && (
         <Source id="fire-heatmap" type="geojson" data={fireHeatmapCollection}>
           <Layer id="fire-heatmap-layer" type="heatmap"
@@ -211,7 +276,7 @@ const MapLayers: React.FC<MapLayersProps> = ({
         </Source>
       )}
 
-      {/* Evacuation zones */}
+      {/* ── Evacuation zones ────────────────────────────────────────────── */}
       {t?.evacuationZones && evacuationZoneCollection.features.length > 0 && (
         <Source id="evacuation-zones" type="geojson" data={evacuationZoneCollection}>
           <Layer id="evacuation-zones-fill" type="fill"
@@ -221,7 +286,7 @@ const MapLayers: React.FC<MapLayersProps> = ({
         </Source>
       )}
 
-      {/* Heat / blast radius */}
+      {/* ── Heat radius ─────────────────────────────────────────────────── */}
       {t?.heatRadius && heatRadiusCollection.features.length > 0 && (
         <Source id="heat-radius" type="geojson" data={heatRadiusCollection}>
           <Layer id="heat-radius-fill" type="fill"
@@ -231,7 +296,7 @@ const MapLayers: React.FC<MapLayersProps> = ({
         </Source>
       )}
 
-      {/* RainViewer weather radar */}
+      {/* ── RainViewer weather radar ─────────────────────────────────────── */}
       {t?.liveWeather && radarTileUrl && (
         <Source id="rainviewer-radar" type="raster" tiles={[radarTileUrl]}
           tileSize={RV_SIZE}
@@ -242,7 +307,7 @@ const MapLayers: React.FC<MapLayersProps> = ({
         </Source>
       )}
 
-      {/* Custom GeoJSON overlay */}
+      {/* ── Custom GeoJSON overlay ───────────────────────────────────────── */}
       {customGeoJSON && (
         <Source id="custom-overlay" type="geojson" data={customGeoJSON}>
           <Layer id="custom-overlay-fill" type="fill"

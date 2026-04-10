@@ -1,7 +1,6 @@
 import type { LayerToggles } from '../../context/PanelContext';
 import type { FireReport, Incident } from '../../hooks/useLocalData';
 
-
 export interface WildfireEvent {
   id:        string;
   latitude:  number;
@@ -9,7 +8,6 @@ export interface WildfireEvent {
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
   message:   string;
 }
-
 
 export interface BroadcastAlert {
   id:           string;
@@ -26,7 +24,6 @@ export interface BroadcastAlert {
   logs?:        { message: string; updated_by: string; timestamp: string }[];
 }
 
-
 export interface Sensor {
   id:          string;
   name:        string;
@@ -40,7 +37,6 @@ export interface Sensor {
   lastPing:    string;
 }
 
-
 export interface PopupInfo {
   longitude: number;
   latitude:  number;
@@ -48,14 +44,12 @@ export interface PopupInfo {
   details:   string;
 }
 
-
 export interface MapStyle {
   id:    string;
   label: string;
   url:   string;
   icon?: string;
 }
-
 
 export interface FireReportReview {
   reviewed_by:       string;
@@ -65,7 +59,6 @@ export interface FireReportReview {
   rejection_reason?: string | null;
   incident_id?:      string | null;
 }
-
 
 export interface BackendSensor {
   id?:            string;
@@ -78,6 +71,23 @@ export interface BackendSensor {
   container_id?:  string | null;
 }
 
+export interface SafeZone {
+  _id?:           string;
+  safe_zone_id:   string;
+  name:           string;
+  description?:   string;
+  category:       'shelter' | 'medical' | 'evacuation_point' | 'command_post' | 'other';
+  status:         'active' | 'at_capacity' | 'closed';
+  coordinates:    [number, number];   // [lng, lat] GeoJSON order
+  radius_m:       number;
+  capacity?:      number;
+  current_count?: number;
+  contact_info?:  string;
+  created_by?:    { email: string | null; name: string | null; user_id: string };
+  created_at?:    string;
+  updated_by?:    { email: string | null; name: string | null; user_id: string } | null;
+  updated_at?:    string | null;
+}
 
 export interface MapProps {
   fires:                        WildfireEvent[];
@@ -85,6 +95,8 @@ export interface MapProps {
   evacuationSafetyScore?:       number;
   broadcastAlerts?:             BroadcastAlert[];
   sensors?:                     Sensor[];
+  safeZones?:                   SafeZone[];           // ← ADDED
+  onSafeZoneClick?:             (zone: SafeZone) => void; // ← ADDED
   incidents?:                   Incident[];
   fireReports?:                 FireReport[];
   onFireReportClick?:           (r: FireReport) => void;
@@ -98,6 +110,8 @@ export interface MapProps {
   onSelectDestinationOnMap?:    (lat: number, lng: number) => void;
   onRequestRouteFromPinned?:    () => void;
   onCancelRoute?:               () => void;
+  isPlacingSafeZone?: boolean;   
+  safeZoneRadiusM?:   number;   
   hasActiveRoute?:              boolean;
   isSelectingDestination?:      boolean;
   destinationPin?:              [number, number] | null;
@@ -111,7 +125,6 @@ export interface MapProps {
   layerToggles?:                LayerToggles;
   customOverlayFile?:           File | null;
 }
-
 
 // Re-export shared types so map sub-components can import from one place
 export type { FireReport, Incident };
