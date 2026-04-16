@@ -98,7 +98,7 @@ const MapCore: React.FC<MapProps> = ({
   const mapLoadedRef          = useRef(false);
 
   // ── State ─────────────────────────────────────────────────────────────────
-  const [viewState, setViewState]                     = useState({ longitude: -79.5, latitude: 44.5, zoom: 10 });
+  const [viewState, setViewState]                     = useState({ longitude: -79.5, latitude: 44.5, zoom: 40 });
   const [userLocation, setUserLocation]               = useState<[number, number] | null>(null);
   const [initialUserLocation, setInitialUserLocation] = useState<[number, number] | null>(null);
   const [popupInfo, setPopupInfo]                     = useState<PopupInfo | null>(null);
