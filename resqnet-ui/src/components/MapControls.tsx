@@ -1,7 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Radio, Compass, List, Plus, ChevronRight,
-  Settings, ShieldCheck, FileText, MapPin, ShieldAlert,
+  Radio,
+  Compass,
+  List,
+  Plus,
+  ChevronRight,
+  Settings,
+  ShieldCheck,
+  FileText,
+  MapPin,
+  ShieldAlert,
 } from "lucide-react";
 import DraggableWindow from "./DraggableWindow";
 import LegendPanel from "./LegendPanel";
@@ -52,12 +60,9 @@ interface MapControlsProps {
 }
 
 const MapControls: React.FC<MapControlsProps> = ({
-  fires,
-  incidentCount,
   isPlacingAlert,
   broadcastAlerts,
   safeZones,
-  sensorCount,
   onBroadcastSubmit,
   onBroadcastChange,
   onBroadcastCancel,
@@ -97,7 +102,8 @@ const MapControls: React.FC<MapControlsProps> = ({
     setCustomOverlayFile,
   } = usePanels();
 
-  const [internalSelected, setInternalSelected] = useState<BroadcastAlert | null>(null);
+  const [internalSelected, setInternalSelected] =
+    useState<BroadcastAlert | null>(null);
   const detailAlert = selectedBroadcast ?? internalSelected;
 
   const handleDetailClose = () => {
@@ -118,13 +124,22 @@ const MapControls: React.FC<MapControlsProps> = ({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (broadcastMenuRef.current && !broadcastMenuRef.current.contains(e.target as Node)) {
+      if (
+        broadcastMenuRef.current &&
+        !broadcastMenuRef.current.contains(e.target as Node)
+      ) {
         setShowBroadcastMenu(false);
       }
-      if (safeZoneMenuRef.current && !safeZoneMenuRef.current.contains(e.target as Node)) {
+      if (
+        safeZoneMenuRef.current &&
+        !safeZoneMenuRef.current.contains(e.target as Node)
+      ) {
         setShowSafeZoneMenu(false);
       }
-      if (incidentMenuRef.current && !incidentMenuRef.current.contains(e.target as Node)) {
+      if (
+        incidentMenuRef.current &&
+        !incidentMenuRef.current.contains(e.target as Node)
+      ) {
         setShowIncidentMenu(false);
       }
     };
@@ -148,7 +163,10 @@ const MapControls: React.FC<MapControlsProps> = ({
   const handleCreateIncident = () => {
     setIncidentsOpen(true);
     setShowIncidentMenu(false);
-    setTimeout(() => window.dispatchEvent(new CustomEvent("incidents:create-draft")), 100);
+    setTimeout(
+      () => window.dispatchEvent(new CustomEvent("incidents:create-draft")),
+      100,
+    );
   };
 
   const handleViewIncidents = () => {
@@ -176,14 +194,14 @@ const MapControls: React.FC<MapControlsProps> = ({
             className={iconBtn(
               incidentsOpen,
               "bg-red-100 text-red-700",
-              "hover:bg-red-50 hover:text-red-600"
+              "hover:bg-red-50 hover:text-red-600",
             )}
           >
             <ShieldAlert size={18} />
           </button>
 
           {showIncidentMenu && (
-            <div className="absolute top-full right-0 mt-2 w-52 bg-white/98 backdrop-blur-sm rounded-xl shadow-xl border border-gray-200 overflow-hidden z-[1000]">
+            <div className="absolute top-full right-0 mt-2 w-52 bg-white/98 backdrop-blur-sm rounded-xl shadow-xl border border-gray-200 overflow-hidden z-1000">
               <button
                 type="button"
                 onClick={handleViewIncidents}
@@ -209,19 +227,6 @@ const MapControls: React.FC<MapControlsProps> = ({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => togglePanel("reports")}
-          title="Fire Reports"
-          className={iconBtn(
-            openPanels.has("reports"),
-            "bg-amber-100 text-amber-700",
-            "hover:bg-amber-50 hover:text-amber-600"
-          )}
-        >
-          <FileText size={18} />
-        </button>
-
         <div className="relative" ref={broadcastMenuRef}>
           <button
             type="button"
@@ -230,14 +235,14 @@ const MapControls: React.FC<MapControlsProps> = ({
             className={iconBtn(
               openPanels.has("broadcast"),
               "bg-orange-100 text-orange-700",
-              "hover:bg-orange-50 hover:text-orange-600"
+              "hover:bg-orange-50 hover:text-orange-600",
             )}
           >
             <Radio size={18} />
           </button>
 
           {showBroadcastMenu && (
-            <div className="absolute top-full right-0 mt-2 w-52 bg-white/98 backdrop-blur-sm rounded-xl shadow-xl border border-gray-200 overflow-hidden z-[1000]">
+            <div className="absolute top-full right-0 mt-2 w-52 bg-white/98 backdrop-blur-sm rounded-xl shadow-xl border border-gray-200 overflow-hidden z-1000">
               <button
                 type="button"
                 onClick={() => openBroadcastSub("list")}
@@ -271,14 +276,14 @@ const MapControls: React.FC<MapControlsProps> = ({
             className={iconBtn(
               openPanels.has("safezones"),
               "bg-green-100 text-green-700",
-              "hover:bg-green-50 hover:text-green-600"
+              "hover:bg-green-50 hover:text-green-600",
             )}
           >
             <ShieldCheck size={18} />
           </button>
 
           {showSafeZoneMenu && (
-            <div className="absolute top-full right-0 mt-2 w-52 bg-white/98 backdrop-blur-sm rounded-xl shadow-xl border border-gray-200 overflow-hidden z-[1000]">
+            <div className="absolute top-full right-0 mt-2 w-52 bg-white/98 backdrop-blur-sm rounded-xl shadow-xl border border-gray-200 overflow-hidden z-1000">
               <button
                 type="button"
                 onClick={() => openSafeZoneSub("list")}
@@ -311,23 +316,10 @@ const MapControls: React.FC<MapControlsProps> = ({
           className={iconBtn(
             openPanels.has("legend"),
             "bg-blue-100 text-blue-700",
-            "hover:bg-blue-50 hover:text-blue-600"
+            "hover:bg-blue-50 hover:text-blue-600",
           )}
         >
           <Compass size={18} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => togglePanel("layers")}
-          title="Map Layers"
-          className={iconBtn(
-            openPanels.has("layers"),
-            "bg-gray-100 text-gray-800",
-            "hover:bg-gray-100 hover:text-gray-800"
-          )}
-        >
-          <Settings size={18} />
         </button>
       </div>
 
@@ -356,7 +348,7 @@ const MapControls: React.FC<MapControlsProps> = ({
             closePanel("broadcast");
           }}
           defaultPosition={{ x: 500, y: 70 }}
-          defaultSize={{ w: 300, h: "auto" as any }}
+          defaultSize={{ w: 300, h: 400}}
         >
           <div className="p-4">
             <BroadcastForm
@@ -370,7 +362,8 @@ const MapControls: React.FC<MapControlsProps> = ({
                 closePanel("broadcast");
               }}
               onActivate={() => {
-                if (latestFormData.current) onBroadcastSubmit(latestFormData.current);
+                if (latestFormData.current)
+                  onBroadcastSubmit(latestFormData.current);
               }}
               loading={broadcastLoading}
               liveRadiusKm={liveRadiusKm}
@@ -416,13 +409,23 @@ const MapControls: React.FC<MapControlsProps> = ({
                       : "CLOSED";
 
                 return (
-                  <div key={z.safe_zone_id} className="px-3 py-3 hover:bg-gray-50 transition-colors">
+                  <div
+                    key={z.safe_zone_id}
+                    className="px-3 py-3 hover:bg-gray-50 transition-colors"
+                  >
                     <div className="flex items-start gap-2">
-                      <ShieldCheck size={16} className="text-green-600 shrink-0 mt-0.5" />
+                      <ShieldCheck
+                        size={16}
+                        className="text-green-600 shrink-0 mt-0.5"
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{z.name}</p>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${statusClass}`}>
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {z.name}
+                          </p>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${statusClass}`}
+                          >
                             {statusLabel}
                           </span>
                         </div>
@@ -431,14 +434,20 @@ const MapControls: React.FC<MapControlsProps> = ({
                           <span className="text-[10px] text-gray-400 font-mono capitalize">
                             {z.category.replace(/_/g, " ")}
                           </span>
-                          <span className="text-[10px] text-gray-400">{z.radius_m}m</span>
+                          <span className="text-[10px] text-gray-400">
+                            {z.radius_m}m
+                          </span>
                           {z.capacity && (
-                            <span className="text-[10px] text-gray-400">cap {z.capacity}</span>
+                            <span className="text-[10px] text-gray-400">
+                              cap {z.capacity}
+                            </span>
                           )}
                         </div>
 
                         {z.description && (
-                          <p className="text-xs text-gray-400 mt-0.5 truncate">{z.description}</p>
+                          <p className="text-xs text-gray-400 mt-0.5 truncate">
+                            {z.description}
+                          </p>
                         )}
 
                         {hasCoords && (
@@ -472,7 +481,7 @@ const MapControls: React.FC<MapControlsProps> = ({
             closePanel("safezones");
           }}
           defaultPosition={{ x: 500, y: 70 }}
-          defaultSize={{ w: 300, h: "auto" as any }}
+          defaultSize={{ w: 300, h: 400}}
         >
           <div className="p-4">
             <SafeZoneForm
@@ -515,7 +524,7 @@ const MapControls: React.FC<MapControlsProps> = ({
           title="Map Layers"
           onClose={() => closePanel("layers")}
           defaultPosition={{ x: 1100, y: 70 }}
-          defaultSize={{ w: 260, h: "auto" as any }}
+          defaultSize={{ w: 260, h: 400 }}
         >
           <LayersPanel
             toggles={layerToggles}

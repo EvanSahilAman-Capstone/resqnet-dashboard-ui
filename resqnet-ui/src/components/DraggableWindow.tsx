@@ -78,7 +78,7 @@ const DraggableWindow: React.FC<DraggableWindowProps> = ({
 
   return (
     <div
-      className="fixed z-[999] bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col"
+      className="fixed z-999 bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col"
       style={{ left: position.x, top: position.y, width: size.w, height: size.h }}
     >
       {/* Header */}

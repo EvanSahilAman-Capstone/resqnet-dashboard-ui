@@ -23,7 +23,8 @@ const TeamsPage: React.FC = () => {
   const [loading, setLoading]       = useState(true);
 
   const role    = (user as any)?.['https://resqnet.com/role'] ?? 'Users';
-  const isAdmin = role === 'Admin';
+  const isAdmin = role === 'Admin'; 
+  void isAdmin;
 
   useEffect(() => {
     const load = async () => {

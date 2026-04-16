@@ -23,7 +23,7 @@ interface Props {
   onInvite: () => void;
 }
 
-const TeamMembers: React.FC<Props> = ({ teamId, teamName, onInvite }) => {
+const TeamMembers: React.FC<Props> = ({ teamId, onInvite }) => {
   const { fetchWithAuth }     = useApi();
   const { user }              = useAuth0();
   const [members, setMembers] = useState<Member[]>([]);

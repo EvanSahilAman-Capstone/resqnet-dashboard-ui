@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
-import { useAuth0 } from '@auth0/auth0-react';
-import Sidebar from './Sidebar';
+import React, { useState } from "react";
+import { Outlet } from "react-router-dom";
+import { useAuth0 } from "@auth0/auth0-react";
+import Sidebar from "./Sidebar";
 
 const Layout: React.FC = () => {
   const { logout } = useAuth0();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleConfirmLogout = () => {
-    logout({ logoutParams: { returnTo: window.location.origin + '/login' } });
+    logout({ logoutParams: { returnTo: window.location.origin + "/login" } });
   };
 
   return (

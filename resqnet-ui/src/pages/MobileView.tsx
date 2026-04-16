@@ -1,16 +1,17 @@
 // This page is JUST FOR POC to test if uploads work (mobile app is not complete as of now)
 // Testing if /upload is working essentially
 
+// This page is now commented out just in case we need it for demo purposes in the future
+
+
 import React, { useState, useEffect, useRef } from "react";
 import Map from "../components/map";
 import { useLocalData } from "../hooks/useLocalData.ts";
 import { useApi } from "../utils/api";
 import { useBroadcastSocket } from "../hooks/useBroadcasts";
 import type { BroadcastAlert, Sensor } from "../components/map/index.tsx";
-import { useAuth0 } from "@auth0/auth0-react"; // If needed for upload
 
-// Copy your exact normalizers from Dashboard
-const normalizeBroadcast = (b: any): BroadcastAlert | null => {
+const normalizeBroadcast = (b): BroadcastAlert | null => {
   const raw = b?.details ?? b?.data ?? b;
   const id = raw._id || raw.id || raw.broadcast_id;
   const coords = raw.coordinates || raw.position;
@@ -54,9 +55,8 @@ const mapBackendToSensor = (backend: any): Sensor => {
 };
 
 const MobilePOC: React.FC = () => {
-  const { fires, loading } = useLocalData() as any;
+  const { fires, loading } = useLocalData();
   const { fetchWithAuth } = useApi();
-  const { isAuthenticated } = useAuth0();
 
   // Same Dashboard state
   const [broadcastAlerts, setBroadcastAlerts] = useState<BroadcastAlert[]>([]);
@@ -174,14 +174,13 @@ const handleHazardSubmit = async (e: React.FormEvent) => {
     // STEP 3
     const reportData = {
       report_id: reportId,
-      uploading_user: 'citizen-mobile-poc',
-      hazard_type: 'fire',
+      uploading_user: "citizen-mobile-poc",
+      hazard_type: "fire",
       coordinates: [44.5, -79.5],
-      photo_link: final_photo_url,
-      severity: 'medium',
-      verified: false,
-      description: hazardDesc,
-      timestamp: new Date().toISOString(),
+      photo_links: [final_photo_url], // ← FIXED: array
+      severity: "medium",
+      description: hazardDesc, // ← Remove verified/timestamp (backend adds)
+      // Backend auto-fills: status, created_by, updated_at
     };
     
     await fetchWithAuth('/reports', {

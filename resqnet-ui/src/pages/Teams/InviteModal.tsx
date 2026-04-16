@@ -22,6 +22,7 @@ const InviteModal: React.FC<Props> = ({ teamId, onClose }) => {
 
   // Only Admins can send invites — Responders see a read-only invite link
   const isAdmin = role_user === 'Admin';
+  void isAdmin;
 
   const submit = async () => {
     if (!email.trim()) return;

@@ -6,8 +6,8 @@ import type { BroadcastAlert } from "../components/map/types";
 import {
   Radio, Flame, RefreshCw, AlertTriangle,
   CheckCircle2, XCircle, Activity, Loader2,
-  ShieldAlert, ChevronDown, ChevronRight, Clock,
-  BarChart3, ListFilter, MapPin, MessageSquare, Edit3,
+  ShieldAlert, ChevronRight, Clock,
+  BarChart3
 } from "lucide-react";
 
 interface FireReport {
@@ -1138,7 +1138,7 @@ function Alerts() {
                           : "—"}
                     </span>
 
-                    <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
+                    <ChevronRight size={14} className="text-gray-300 shrink-0" />
                   </div>
 
                   <div className="px-3 pb-3">
