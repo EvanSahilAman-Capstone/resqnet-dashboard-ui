@@ -27,6 +27,7 @@ import { useApi } from "../utils/api";
 import { SENSOR_LOCATION_NAMES } from "../components/map/constants";
 import type { BackendSensor } from "../components/map/types";
 
+
 export interface Sensor {
   id: string;
   name: string;
@@ -40,20 +41,19 @@ export interface Sensor {
   lastPing: string;
   containerId?: string;
   locationName: string;
-  // ML — mapped from /sensors/predictions
   fireDetected?: boolean;
-  fireScore?: number;       // confidence value (0.0–1.0)
-  mlSeverity?: string;      // "normal" | "elevated" | "critical" | "warming_up"
-  mlRiskLevel?: string;     // derived: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+  fireScore?: number;
+  mlSeverity?: string;
+  mlRiskLevel?: string;
   mlConfidence?: number;
   bufferSize?: number;
 }
 
-// ── Section descriptor for drag-reorder ──────────────────────────────────────
+
 type SectionKey = "ml" | "env" | "location" | "device";
 const DEFAULT_SECTION_ORDER: SectionKey[] = ["ml", "env", "location", "device"];
 
-// ── Status Icon ───────────────────────────────────────────────────────────────
+
 const StatusIcon = ({ status, size = 18 }: { status: Sensor["status"]; size?: number }) => {
   switch (status) {
     case "ONLINE":  return <CheckCircle2 size={size} className="text-emerald-500" />;
@@ -63,7 +63,7 @@ const StatusIcon = ({ status, size = 18 }: { status: Sensor["status"]; size?: nu
   }
 };
 
-// ── Battery Icon ──────────────────────────────────────────────────────────────
+
 const BatteryIcon = ({ level, size = 18 }: { level: number; size?: number }) => {
   if (level >= 75) return <BatteryFull size={size} className="text-emerald-500" />;
   if (level >= 40) return <BatteryMedium size={size} className="text-amber-500" />;
@@ -71,15 +71,17 @@ const BatteryIcon = ({ level, size = 18 }: { level: number; size?: number }) => 
   return <BatteryWarning size={size} className="text-rose-500" />;
 };
 
+
 const TempIcon = ({ value, size = 16 }: { value: number; size?: number }) => (
   <Thermometer size={size} className={value >= 40 ? "text-rose-500" : value >= 28 ? "text-amber-500" : "text-emerald-500"} />
 );
+
 
 const HumidityIcon = ({ value, size = 16 }: { value: number; size?: number }) => (
   <Droplets size={size} className={value >= 80 ? "text-blue-500" : value >= 50 ? "text-emerald-500" : "text-amber-500"} />
 );
 
-// ── ML Risk styles — driven by severity from backend ─────────────────────────
+
 const getMLRiskStyles = (risk?: string) => {
   switch (risk?.toUpperCase()) {
     case "CRITICAL":
@@ -96,7 +98,7 @@ const getMLRiskStyles = (risk?: string) => {
   }
 };
 
-// Derive a display risk level from backend severity
+
 const severityToRisk = (severity?: string): string => {
   switch (severity?.toLowerCase()) {
     case "critical":   return "CRITICAL";
@@ -107,7 +109,23 @@ const severityToRisk = (severity?: string): string => {
   }
 };
 
-// ── Collapsible Section with drag handle ─────────────────────────────────────
+
+// FIX 1: widened dragHandleProps type to include draggable + drag events
+interface CollapsibleSectionProps {
+  title: string;
+  icon: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & {
+    draggable?: boolean;
+    onDragStart?: React.DragEventHandler<HTMLDivElement>;
+    onDragOver?: React.DragEventHandler<HTMLDivElement>;
+    onDrop?: React.DragEventHandler<HTMLDivElement>;
+    onDragEnd?: React.DragEventHandler<HTMLDivElement>;
+  };
+  isDragging?: boolean;
+}
+
 const CollapsibleSection = ({
   title,
   icon,
@@ -115,14 +133,7 @@ const CollapsibleSection = ({
   children,
   dragHandleProps,
   isDragging,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
-  isDragging?: boolean;
-}) => {
+}: CollapsibleSectionProps) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div
@@ -131,7 +142,6 @@ const CollapsibleSection = ({
       }`}
     >
       <div className="flex w-full items-center">
-        {/* Drag handle */}
         <div
           {...dragHandleProps}
           className="flex-none flex items-center justify-center px-3 py-4 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-400 transition"
@@ -161,14 +171,12 @@ const CollapsibleSection = ({
   );
 };
 
-// ── useDragReorder hook ───────────────────────────────────────────────────────
+
 function useDragReorder<T>(initialItems: T[]) {
   const [items, setItems] = useState<T[]>(initialItems);
   const dragIndex = useRef<number | null>(null);
   const overIndex  = useRef<number | null>(null);
 
-  // Update items when initialItems reference changes (e.g. after fetch)
-  // but only if the length changes to avoid resetting user ordering
   const prevLen = useRef(initialItems.length);
   useEffect(() => {
     if (initialItems.length !== prevLen.current) {
@@ -180,7 +188,6 @@ function useDragReorder<T>(initialItems: T[]) {
   const onDragStart = (index: number) => (e: React.DragEvent) => {
     dragIndex.current = index;
     e.dataTransfer.effectAllowed = "move";
-    // ghost image
     const el = e.currentTarget as HTMLElement;
     e.dataTransfer.setDragImage(el, el.offsetWidth / 2, 20);
   };
@@ -213,7 +220,7 @@ function useDragReorder<T>(initialItems: T[]) {
   return { items, setItems, onDragStart, onDragOver, onDrop, onDragEnd };
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+
 const Sensors: React.FC = () => {
   const { fetchWithAuth } = useApi();
   const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null);
@@ -222,16 +229,12 @@ const Sensors: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow]             = useState(Date.now());
 
-  // drag-reorder for sensor card list
   const sensorDrag = useDragReorder<Sensor>([]);
-  // drag-reorder for detail panel sections
   const sectionDrag = useDragReorder<SectionKey>(DEFAULT_SECTION_ORDER);
 
-  // sync sensor drag list when rawSensors changes
   useEffect(() => {
     if (rawSensors.length === 0) return;
     sensorDrag.setItems((prev) => {
-      // preserve order for existing sensors, append new ones
       const prevIds = prev.map((s) => s.id);
       const updated = prev.map((p) => rawSensors.find((r) => r.id === p.id) ?? p);
       const newOnes = rawSensors.filter((r) => !prevIds.includes(r.id));
@@ -265,11 +268,10 @@ const Sensors: React.FC = () => {
     if (ageSec < 90)  status = "ONLINE";
     else if (ageSec < 420) status = "WARNING";
 
-    // Merge prediction data
     const pred = predMap[backend.id ?? ""];
     const fireDetected: boolean | undefined = pred?.fire_detected;
     const confidence: number | undefined    = pred ? Number(pred.confidence) : undefined;
-    const severity: string | undefined      = pred?.severity;           // "normal" | "elevated" | "critical" | "warming_up"
+    const severity: string | undefined      = pred?.severity;
     const bufferSize: number | undefined    = pred ? Number(pred.buffer_size) : undefined;
     const mlRiskLevel                       = severityToRisk(severity);
 
@@ -286,9 +288,8 @@ const Sensors: React.FC = () => {
       lastPing:     lastSeen > 0 ? new Date(lastSeen * 1000).toISOString() : new Date(0).toISOString(),
       containerId:  backend.container_id || undefined,
       locationName: SENSOR_LOCATION_NAMES[backend.id ?? ""] || "Unknown Location",
-      // ML
       fireDetected,
-      fireScore:    confidence,           // confidence IS the fire probability (0–1)
+      fireScore:    confidence,
       mlSeverity:   severity,
       mlRiskLevel,
       mlConfidence: confidence,
@@ -302,13 +303,11 @@ const Sensors: React.FC = () => {
         if (manual) setRefreshing(true);
         else setLoading(true);
 
-        // Fetch both in parallel
         const [sensorsData, predictionsData] = await Promise.all([
           fetchWithAuth("/sensors"),
           fetchWithAuth("/sensors/predictions").catch(() => ({ predictions: [] })),
         ]);
 
-        // Build prediction lookup by sensor_id
         const predMap: Record<string, any> = {};
         for (const p of predictionsData?.predictions ?? []) {
           predMap[p.sensor_id] = p;
@@ -371,7 +370,6 @@ const Sensors: React.FC = () => {
     return `${Math.floor(diffHours / 24)}d ago`;
   };
 
-  // ── Metric Tile ─────────────────────────────────────────────────────────────
   const MetricTile = ({ label, value, subtext, icon }: { label: string; value: string; subtext?: string; icon?: React.ReactNode }) => (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
       <div className="flex items-center gap-1.5">
@@ -383,7 +381,6 @@ const Sensors: React.FC = () => {
     </div>
   );
 
-  // ── Info Row ────────────────────────────────────────────────────────────────
   const InfoRow = ({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) => (
     <div className="border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-1.5">
@@ -394,11 +391,10 @@ const Sensors: React.FC = () => {
     </div>
   );
 
-  // ── ML Score Bar ────────────────────────────────────────────────────────────
   const MLScoreBar = ({ score, riskStyles }: { score: number; riskStyles: ReturnType<typeof getMLRiskStyles> }) => (
     <div className="mt-3">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-medium text-slate-500">Fire Probability</span>
+        <span className="text-xs font-medium text-slate-500">Prediction Confidence</span>
         <span className={`text-xs font-bold ${riskStyles.label}`}>{(score * 100).toFixed(1)}%</span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
@@ -410,10 +406,9 @@ const Sensors: React.FC = () => {
     </div>
   );
 
-  // ── Section renderers ───────────────────────────────────────────────────────
   const renderSection = (key: SectionKey, sensor: Sensor, index: number) => {
     const dragProps = {
-      draggable: true,
+      draggable: true as const,
       onDragStart: sectionDrag.onDragStart(index),
       onDragOver: sectionDrag.onDragOver(index),
       onDrop: sectionDrag.onDrop(index),
@@ -433,7 +428,6 @@ const Sensors: React.FC = () => {
           >
             {sensor.mlSeverity || sensor.fireDetected !== undefined ? (
               <div className="space-y-4">
-                {/* Warming up notice */}
                 {sensor.mlSeverity === "warming_up" && (
                   <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
                     <Clock size={14} className="shrink-0 text-slate-400" />
@@ -443,14 +437,14 @@ const Sensors: React.FC = () => {
                   </div>
                 )}
 
-                {/* Score bar */}
                 {sensor.fireScore !== undefined && sensor.mlSeverity !== "warming_up" && (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1.5">
                         <BarChart2 size={14} className="text-slate-400" />
+                        {/* FIX 2: was a JS template literal inside JSX — changed to JSX expression */}
                         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Fire Probability Score
+                          {`Confidence: ${sensor.fireDetected ? "FIRE DETECTED" : "NO FIRE"}`}
                         </span>
                       </div>
                       <span className={`text-lg font-bold ${mlStyles.label}`}>
@@ -466,7 +460,6 @@ const Sensors: React.FC = () => {
                   </div>
                 )}
 
-                {/* Info rows */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <InfoRow
                     label="Fire Detected"
@@ -495,7 +488,6 @@ const Sensors: React.FC = () => {
                   />
                 </div>
 
-                {/* Buffer size */}
                 {sensor.bufferSize !== undefined && (
                   <p className="text-xs text-slate-400">
                     Rolling buffer: {sensor.bufferSize}/10 readings
@@ -557,8 +549,8 @@ const Sensors: React.FC = () => {
             dragHandleProps={dragProps}
           >
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              <InfoRow label="Sensor ID"    value={sensor.id}                        icon={<Cpu size={12} className="text-slate-400" />} />
-              <InfoRow label="Container ID" value={sensor.containerId || "N/A"}      icon={<Cpu size={12} className="text-slate-400" />} />
+              <InfoRow label="Sensor ID"    value={sensor.id}                   icon={<Cpu size={12} className="text-slate-400" />} />
+              <InfoRow label="Container ID" value={sensor.containerId || "N/A"} icon={<Cpu size={12} className="text-slate-400" />} />
             </div>
           </CollapsibleSection>
         );
@@ -568,12 +560,10 @@ const Sensors: React.FC = () => {
     }
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-screen-2xl space-y-6 p-4 sm:p-6 lg:p-8">
 
-        {/* Header */}
         <div className="flex flex-col gap-4 border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium text-slate-500">Sensor Monitoring</p>
@@ -601,10 +591,8 @@ const Sensors: React.FC = () => {
           </div>
         </div>
 
-        {/* Body */}
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
 
-          {/* Sensor List — draggable cards */}
           <div className="xl:col-span-4">
             {loading ? (
               <div className="border border-slate-200 bg-white p-8 text-center shadow-sm">
@@ -659,14 +647,12 @@ const Sensors: React.FC = () => {
                         tabIndex={0}
                         onKeyDown={(e) => e.key === "Enter" && setSelectedSensor(sensor)}
                       >
-                        {/* Drag hint */}
                         <div className="flex items-start gap-2">
                           <GripVertical
                             size={16}
                             className="mt-1 flex-none text-slate-300 group-hover:text-slate-400 cursor-grab active:cursor-grabbing"
                           />
                           <div className="min-w-0 flex-1">
-                            {/* Top row */}
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
@@ -697,12 +683,10 @@ const Sensors: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* ML score bar */}
                             {sensor.fireScore !== undefined && sensor.mlSeverity !== "warming_up" && (
                               <MLScoreBar score={sensor.fireScore} riskStyles={mlStyles} />
                             )}
 
-                            {/* Metrics row */}
                             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                               <div>
                                 <div className="flex items-center gap-1">
@@ -743,12 +727,10 @@ const Sensors: React.FC = () => {
             )}
           </div>
 
-          {/* Detail Panel — draggable sections */}
           <div className="xl:col-span-8 overflow-y-auto" style={{ maxHeight: "calc(100vh - 220px)" }}>
             {selectedSensor ? (
               <div className="space-y-4">
 
-                {/* Header card */}
                 <div className="border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
                   <div className="flex flex-col gap-5 border-b border-slate-200 pb-6 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0">
@@ -775,16 +757,15 @@ const Sensors: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Metric tiles */}
                   <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <MetricTile label="Temperature" value={`${selectedSensor.temperature}°C`} subtext="Current reading" icon={<TempIcon value={selectedSensor.temperature} size={15} />} />
-                    <MetricTile label="Humidity"    value={`${selectedSensor.humidity}%`}     subtext="Ambient moisture" icon={<HumidityIcon value={selectedSensor.humidity} size={15} />} />
-                    <MetricTile label="Battery"     value={`${selectedSensor.battery}%`}      subtext="Remaining charge" icon={<BatteryIcon level={selectedSensor.battery} size={15} />} />
+                    <MetricTile label="Temperature" value={`${selectedSensor.temperature}°C`} subtext="Current reading"   icon={<TempIcon value={selectedSensor.temperature} size={15} />} />
+                    <MetricTile label="Humidity"    value={`${selectedSensor.humidity}%`}     subtext="Ambient moisture"  icon={<HumidityIcon value={selectedSensor.humidity} size={15} />} />
+                    <MetricTile label="Battery"     value={`${selectedSensor.battery}%`}      subtext="Remaining charge"  icon={<BatteryIcon level={selectedSensor.battery} size={15} />} />
 
-                    {/* Fire Score tile */}
+                    {/* FIX 3: replaced border-current/20 with explicit border-slate-200 */}
                     <div className={`rounded-2xl border p-5 ${
                       selectedSensor.fireScore !== undefined && selectedSensor.mlSeverity !== "warming_up"
-                        ? `${getMLRiskStyles(selectedSensor.mlRiskLevel).pill} border-current/20`
+                        ? `${getMLRiskStyles(selectedSensor.mlRiskLevel).pill} border-slate-200`
                         : "border-slate-200 bg-slate-50"
                     }`}>
                       <div className="flex items-center gap-1.5">
@@ -818,9 +799,7 @@ const Sensors: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Draggable sections */}
                 <div className="space-y-4">
-
                   {sectionDrag.items.map((key, index) =>
                     renderSection(key, selectedSensor, index)
                   )}
