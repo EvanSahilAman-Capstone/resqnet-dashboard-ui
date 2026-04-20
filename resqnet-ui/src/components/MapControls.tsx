@@ -5,9 +5,7 @@ import {
   List,
   Plus,
   ChevronRight,
-  Settings,
   ShieldCheck,
-  FileText,
   MapPin,
   ShieldAlert,
 } from "lucide-react";
